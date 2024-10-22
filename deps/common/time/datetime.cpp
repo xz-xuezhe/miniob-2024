@@ -441,4 +441,11 @@ bool DateTime::is_valid_xml_datetime(const string &str)
   return true;
 }
 
+bool check_date(int y, int m, int d)
+{
+  static int mon[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  bool       leap  = (y % 400 == 0 || (y % 100 != 0 && y % 4 == 0));
+  return 1 <= y && y <= 9999 && 1 <= m && m <= 12 && 1 <= d && d <= (mon[m] + (m == 2 && leap ? 1 : 0));
+}
+
 }  // namespace common
