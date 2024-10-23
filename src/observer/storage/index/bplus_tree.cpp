@@ -21,6 +21,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/global_context.h"
 #include "sql/parser/parse_defs.h"
 #include "storage/buffer/disk_buffer_pool.h"
+#include "storage/index/bplus_tree_log.h"
 
 using namespace common;
 
@@ -971,6 +972,20 @@ RC BplusTreeHandler::close()
     disk_buffer_pool_->close_file();
   }
 
+  disk_buffer_pool_ = nullptr;
+  return RC::SUCCESS;
+}
+
+RC BplusTreeHandler::remove()
+{
+  RC rc = RC::SUCCESS;
+  if (disk_buffer_pool_ != nullptr) {
+    rc = disk_buffer_pool_->remove_file();
+    if(rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to remove file in BplusTreeHandler");
+      return rc;
+    }
+  }
   disk_buffer_pool_ = nullptr;
   return RC::SUCCESS;
 }

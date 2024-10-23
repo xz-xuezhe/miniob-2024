@@ -80,6 +80,22 @@ RC BplusTreeIndex::close()
   return RC::SUCCESS;
 }
 
+RC BplusTreeIndex::destroy()
+{
+  RC rc = RC::SUCCESS;
+  if (inited_) {
+    LOG_INFO("Begin to destroy index, index:%s, field:%s", index_meta_.name(), index_meta_.field());
+    rc = index_handler_.remove();
+    if(rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to destory index handler when destroying index");
+      return rc;
+    }
+    inited_ = false;
+  }
+  LOG_INFO("Successfully destroy index.");
+  return RC::SUCCESS;
+}
+
 RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
 {
   return index_handler_.insert_entry(record + field_meta_.offset(), rid);

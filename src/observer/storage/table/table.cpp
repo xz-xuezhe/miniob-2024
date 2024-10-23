@@ -127,6 +127,44 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   return rc;
 }
 
+RC Table::drop(const char *path)
+{
+  RC rc = RC::SUCCESS;
+
+  if(record_handler_ != nullptr) {
+    record_handler_->close();
+    delete record_handler_;
+    record_handler_ = nullptr;
+  }
+
+  if(data_buffer_pool_ != nullptr) {
+    rc = data_buffer_pool_->remove_file();
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to remove file in the data buffer pool, file:%s", path);
+      return rc;
+    }
+    data_buffer_pool_ = nullptr;
+  }
+  
+  if (remove(path)) {
+    LOG_ERROR("Failed to remove file: %s", path);
+    return RC::FILE_REMOVE;
+  }
+
+  for(Index *index : indexes_){
+    rc = index->destroy();
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to drop index when dropping table %s", path);
+      return rc;
+    }
+    delete index;
+  }
+  indexes_.clear();
+
+  LOG_INFO("Successfully drop table %s", path);
+  return rc;
+}
+
 RC Table::open(Db *db, const char *meta_file, const char *base_dir)
 {
   // 加载元数据文件
