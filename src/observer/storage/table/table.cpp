@@ -506,11 +506,52 @@ RC Table::delete_record(const Record &record)
   RC rc = RC::SUCCESS;
   for (Index *index : indexes_) {
     rc = index->delete_entry(record.data(), &record.rid());
-    ASSERT(RC::SUCCESS == rc, 
+    ASSERT(RC::SUCCESS == rc,
            "failed to delete entry from index. table name=%s, index name=%s, rid=%s, rc=%s",
            name(), index->index_meta().name(), record.rid().to_string().c_str(), strrc(rc));
   }
   rc = record_handler_->delete_record(&record.rid());
+  return rc;
+}
+
+RC Table::update_record(const RID &rid, const FieldMeta *field_meta, const Value &value)
+{
+  RC     rc = RC::SUCCESS;
+  Record record;
+  rc = get_record(rid, record);
+  if (OB_FAIL(rc))
+    return rc;
+  return update_record(record, field_meta, value);
+}
+
+RC Table::update_record(Record &record, const FieldMeta *field, const Value &value)
+{
+  RC rc = RC::SUCCESS;
+  for (Index *index : indexes_) {
+    rc = index->delete_entry(record.data(), &record.rid());
+    ASSERT(RC::SUCCESS == rc,
+           "failed to delete entry from index. table name=%s, index name=%s, rid=%s, rc=%s",
+           name(), index->index_meta().name(), record.rid().to_string().c_str(), strrc(rc));
+  }
+  if (field->type() != value.attr_type()) {
+    Value real_value;
+    rc = Value::cast_to(value, field->type(), real_value);
+    if (OB_FAIL(rc)) {
+      LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
+          table_meta_.name(), field->name(), value.to_string().c_str());
+      return rc;
+    }
+    rc = set_value_to_record(record.data(), real_value, field);
+  } else {
+    rc = set_value_to_record(record.data(), value, field);
+  }
+  rc = record_handler_->update_record(record.rid(), record.data());
+  rc = insert_entry_of_indexes(record.data(), record.rid());
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("failed to insert entry into index. table name=%s, rid=%s, rc=%s",
+           name(), record.rid().to_string().c_str(), strrc(rc));
+    return rc;
+  }
   return rc;
 }
 

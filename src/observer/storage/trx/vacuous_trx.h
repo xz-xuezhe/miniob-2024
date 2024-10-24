@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "storage/field/field_meta.h"
 #include "storage/trx/trx.h"
 
 /**
@@ -46,6 +47,7 @@ public:
 
   RC insert_record(Table *table, Record &record) override;
   RC delete_record(Table *table, Record &record) override;
+  RC update_record(Table *table, Record &record, const FieldMeta *field_meta, const Value &value) override;
   RC visit_record(Table *table, Record &record, ReadWriteMode mode) override;
   RC start_if_need() override;
   RC commit() override;

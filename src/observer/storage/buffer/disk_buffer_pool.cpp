@@ -930,7 +930,10 @@ RC BufferPoolManager::remove_file(const char *_file_name)
     LOG_ERROR("failed to close file when removing file");
     return rc;
   }
-  remove(file_name.c_str());
+  if (remove(file_name.c_str())) {
+    LOG_ERROR("failed to remove file: %s", file_name.c_str());
+    return RC::FILE_REMOVE;
+  }
   return RC::SUCCESS;
 }
 
