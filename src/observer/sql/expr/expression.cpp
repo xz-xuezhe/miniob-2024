@@ -13,7 +13,6 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/expr/expression.h"
-#include "common/type/attr_type.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
 
@@ -121,7 +120,7 @@ ComparisonExpr::~ComparisonExpr() {}
 
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
-  if (comp_ == LIKE) {
+  if (comp_ == LIKE || comp_ == NOT_LIKE) {
     if (left.attr_type() != AttrType::CHARS || right.attr_type() != AttrType::CHARS) {
       LOG_WARN("unsupported comparison. %d", comp_);
       return RC::INTERNAL;
@@ -148,7 +147,10 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
         f[0] = 0;
       }
     }
-    result = f.back();
+    if (comp_ == LIKE)
+      result = f.back();
+    else
+      result = !f.back();
     return RC::SUCCESS;
   }
   RC  rc         = RC::SUCCESS;
