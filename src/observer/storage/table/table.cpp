@@ -539,6 +539,7 @@ RC Table::update_record(Record &record, const FieldMeta *field, const Value &val
     if (OB_FAIL(rc)) {
       LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
           table_meta_.name(), field->name(), value.to_string().c_str());
+      insert_entry_of_indexes(record.data(), record.rid());
       return rc;
     }
     rc = set_value_to_record(record.data(), real_value, field);
