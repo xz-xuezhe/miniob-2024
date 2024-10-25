@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/expr/expression.h"
+#include "common/type/attr_type.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
 
@@ -120,6 +121,36 @@ ComparisonExpr::~ComparisonExpr() {}
 
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
+  if (comp_ == LIKE) {
+    if (left.attr_type() != AttrType::CHARS || right.attr_type() != AttrType::CHARS) {
+      LOG_WARN("unsupported comparison. %d", comp_);
+      return RC::INTERNAL;
+    }
+    const string &sl = left.get_string(), &sr = right.get_string();
+    vector<int>   f(sl.length() + 1, 0);
+    f[0] = 1;
+    for (const char &c : sr) {
+      if (c == '%') {
+        for (size_t i = 1; i != f.size(); i++)
+          if (f[i - 1])
+            f[i] = 1;
+      } else if (c == '_') {
+        for (size_t i = f.size() - 1; i; i--)
+          f[i] = f[i - 1];
+        f[0] = 0;
+      } else {
+        for (size_t i = f.size() - 1; i; i--) {
+          if (sl[i - 1] == c && f[i - 1])
+            f[i] = 1;
+          else
+            f[i] = 0;
+        }
+        f[0] = 0;
+      }
+    }
+    result = f.back();
+    return RC::SUCCESS;
+  }
   RC  rc         = RC::SUCCESS;
   int cmp_result = left.compare(right);
   result         = false;
