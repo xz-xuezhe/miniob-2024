@@ -57,24 +57,15 @@ RC SumAggregator::evaluate(Value& result)
 
 AvgAggregator::AvgAggregator()
 {
-  count_ = 0;
+  float x = 0;
+  count_  = 0;
+  value_.set_type(AttrType::FLOATS);
+  value_.set_data((char *)&x, sizeof(x));
 }
 RC AvgAggregator::accumulate(const Value &value)
 {
-  if (value_.attr_type() == AttrType::UNDEFINED) {
-    ++count_;
-    value_ = value;
-    return RC::SUCCESS;
-  }
-  
-  ASSERT(value.attr_type() == value_.attr_type(), "type mismatch. value type: %s, value_.type: %s", 
-        attr_type_to_string(value.attr_type()), attr_type_to_string(value_.attr_type()));
-  
   ++count_;
-  Value temp;
-  Value::subtract(value, value_, temp);
-  Value::divide(temp, Value(count_), temp);
-  Value::add(temp, value_, value_);
+  Value::add(Value((value.get_float() - value_.get_float()) / count_), value_, value_);
   return RC::SUCCESS;
 }
 
