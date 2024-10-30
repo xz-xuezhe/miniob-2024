@@ -320,18 +320,8 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
             table_meta_.name(), field->name(), value.to_string().c_str());
         break;
       }
-      if (real_value.length() != field->len()) {
-        LOG_WARN("the length of the record does not match the field. field name:%s,values:%s", field->name(), value.to_string().c_str());
-        rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
-        break;
-      }
       rc = set_value_to_record(record_data, real_value, field);
     } else {
-      if (value.length() != field->len()) {
-        LOG_WARN("the length of the record does not match the field. field name:%s,values:%s", field->name(), value.to_string().c_str());
-        rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
-        break;
-      }
       rc = set_value_to_record(record_data, value, field);
     }
   }
@@ -353,6 +343,9 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     if (copy_len > data_len) {
       copy_len = data_len + 1;
     }
+  } else if(field->type() == AttrType::VECTORS) {
+    if (copy_len != data_len)
+      return RC::INVALID_ARGUMENT;
   }
   memcpy(record_data + field->offset(), value.data(), copy_len);
   return RC::SUCCESS;
