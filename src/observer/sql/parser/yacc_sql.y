@@ -139,6 +139,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %token <number> NUMBER
 %token <floats> FLOAT
 %token <string> ID
+%token <string> AGGREGATE
 %token <string> SSS
 //非终结符
 
@@ -521,6 +522,9 @@ expression:
     }
     | '-' expression %prec UMINUS {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::NEGATIVE, $2, nullptr, sql_string, &@$);
+    }
+    | AGGREGATE LBRACE expression RBRACE {
+      $$ = create_aggregate_expression($1, $3, sql_string, &@$);
     }
     | value {
       $$ = new ValueExpr(*$1);
