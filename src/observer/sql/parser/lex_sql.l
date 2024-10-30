@@ -131,6 +131,8 @@ L2_DISTANCE                             RETURN_TOKEN(L2_DISTANCE);
 COSINE_DISTANCE                         RETURN_TOKEN(COSINE_DISTANCE);
 INNER_PRODUCT                           RETURN_TOKEN(INNER_PRODUCT);
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);
+"["                                     RETURN_TOKEN(LBRACKET);
+"]"                                     RETURN_TOKEN(RBRACKET);
 "("                                     RETURN_TOKEN(LBRACE);
 ")"                                     RETURN_TOKEN(RBRACE);
 

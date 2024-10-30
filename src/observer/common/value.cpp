@@ -28,6 +28,42 @@ Value::Value(bool val) { set_boolean(val); }
 
 Value::Value(const char *s, int len /*= 0*/) { set_string(s, len); }
 
+Value::Value(const std::vector<Value> &val_list)
+{
+  attr_type_      = AttrType::VECTORS;
+  int8_t is_float = 0;
+  int    length   = val_list.size();
+  for (const Value &value : val_list) {
+    if (value.attr_type() != AttrType::INTS && value.attr_type() != AttrType::FLOATS) {
+      attr_type_ = AttrType::UNDEFINED;
+      break;
+    }
+    if (value.attr_type() == AttrType::FLOATS)
+      is_float = true;
+  }
+  if (AttrType::VECTORS == attr_type_) {
+    if (is_float) {
+      int   size = 1 + sizeof(float) * val_list.size();
+      char *data = new char[size];
+      *data      = is_float;
+      for (int i = 0; i < length; i++)
+        ((float *)(data + 1))[i] = val_list[i].get_float();
+      set_vector(data, size);
+      delete[] data;
+      data = nullptr;
+    } else {
+      int   size = 1 + sizeof(int32_t) * val_list.size();
+      char *data = new char[size];
+      *data      = is_float;
+      for (int i = 0; i < length; i++)
+        ((int32_t *)(data + 1))[i] = val_list[i].get_int();
+      set_vector(data, size);
+      delete[] data;
+      data = nullptr;
+    }
+  }
+}
+
 Value::Value(const Value &other)
 {
   this->attr_type_ = other.attr_type_;

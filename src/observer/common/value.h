@@ -47,6 +47,7 @@ public:
   explicit Value(float val);
   explicit Value(bool val);
   explicit Value(const char *s, int len = 0);
+  explicit Value(const std::vector<Value> &val_list);
 
   Value(const Value &other);
   Value(Value &&other);

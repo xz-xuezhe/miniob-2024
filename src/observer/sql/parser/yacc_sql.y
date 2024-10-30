@@ -82,6 +82,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         UPDATE
         LBRACE
         RBRACE
+        LBRACKET
+        RBRACKET
         COMMA
         TRX_BEGIN
         TRX_COMMIT
@@ -410,7 +412,16 @@ value_list:
     }
     ;
 value:
-    NUMBER {
+    LBRACKET value value_list RBRACKET {
+      if ($3 == nullptr)
+        $3 = new std::vector<Value>;
+      $3->emplace_back(*$2);
+      delete $2;
+      std::reverse($3->begin(), $3->end());
+      $$ = new Value(*$3);
+      delete $3;
+    }
+    |NUMBER {
       $$ = new Value((int)$1);
       @$ = @1;
     }
