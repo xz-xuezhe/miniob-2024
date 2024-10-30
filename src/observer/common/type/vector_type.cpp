@@ -261,7 +261,7 @@ RC VectorType::l2_distance(const Value &left, const Value &right, Value &result)
     float value_right = get_element_at(right_ptr->data(), i).get_float();
     sum += (value_left - value_right) * (value_left - value_right);
   }
-  result.set_float(std::sqrt(sum));
+  result.set_float(std::round(std::sqrt(sum) * 100) / 100);
   if (&left != left_ptr)
     delete left_ptr;
   if (&right != right_ptr)
@@ -308,7 +308,7 @@ RC VectorType::cosine_distance(const Value &left, const Value &right, Value &res
     sum_left += value_left * value_left;
     sum_right += value_right * value_right;
   }
-  result.set_float(1 - sum_dot / std::sqrt(sum_left * sum_right));
+  result.set_float(std::round((1 - sum_dot / std::sqrt(sum_left * sum_right)) * 100) / 100);
   if (&left != left_ptr)
     delete left_ptr;
   if (&right != right_ptr)
@@ -351,7 +351,7 @@ RC VectorType::inner_product(const Value &left, const Value &right, Value &resul
     float value_right = get_element_at(right_ptr->data(), i).get_float();
     sum += value_left * value_right;
   }
-  result.set_float(sum);
+  result.set_float(std::round(sum * 100) / 100);
   if (&left != left_ptr)
     delete left_ptr;
   if (&right != right_ptr)
@@ -369,7 +369,7 @@ RC VectorType::to_string(const Value &val, string &result) const
       ss << ',';
     Numeric v = get_element_at(val.data(), i);
     if (v.is_float)
-      ss << v.value.value_float;
+      ss << std::round(v.value.value_float * 100) / 100;
     else
       ss << v.value.value_int;
   }
