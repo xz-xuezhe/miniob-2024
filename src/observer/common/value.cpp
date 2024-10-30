@@ -38,6 +38,10 @@ Value::Value(const Value &other)
       set_string_from_other(other);
     } break;
 
+    case AttrType::VECTORS: {
+      set_vector_from_other(other);
+    } break;
+
     default: {
       this->value_ = other.value_;
     } break;
@@ -113,6 +117,9 @@ void Value::set_data(char *data, int length)
     case AttrType::CHARS: {
       set_string(data, length);
     } break;
+    case AttrType::VECTORS: {
+      set_vector(data, length);
+    } break;
     case AttrType::INTS: {
       value_.int_value_ = *(int *)data;
       length_           = length;
@@ -161,9 +168,9 @@ void Value::set_boolean(bool val)
 void Value::set_date(int y, int m, int d)
 {
   reset();
-  attr_type_ = AttrType::DATES;
+  attr_type_        = AttrType::DATES;
   value_.int_value_ = y * 10000 + m * 100 + d;
-  length_ = sizeof(int);
+  length_           = sizeof(int);
 }
 
 void Value::set_string(const char *s, int len /*= 0*/)
@@ -187,6 +194,21 @@ void Value::set_string(const char *s, int len /*= 0*/)
   }
 }
 
+void Value::set_vector(const char *s, int len)
+{
+  reset();
+  attr_type_ = AttrType::VECTORS;
+  if (s == nullptr) {
+    value_.pointer_value_ = nullptr;
+    length_               = 0;
+  } else {
+    own_data_ = true;
+    value_.pointer_value_ = new char[len];
+    length_               = len;
+    memcpy(value_.pointer_value_, s, len);
+  }
+}
+
 void Value::set_value(const Value &value)
 {
   switch (value.attr_type_) {
@@ -198,6 +220,13 @@ void Value::set_value(const Value &value)
     } break;
     case AttrType::CHARS: {
       set_string(value.get_string().c_str());
+    } break;
+    case AttrType::DATES: {
+      int v = value.value_.int_value_;
+      set_date(v / 10000, v / 100 % 100, v % 100);
+    }
+    case AttrType::VECTORS: {
+      set_data(value.data(), value.length());
     } break;
     case AttrType::BOOLEANS: {
       set_boolean(value.get_boolean());
@@ -218,10 +247,20 @@ void Value::set_string_from_other(const Value &other)
   }
 }
 
+void Value::set_vector_from_other(const Value &other)
+{
+  ASSERT(attr_type_ == AttrType::VECTORS, "attr type is not VECTORS");
+  if (own_data_ && other.value_.pointer_value_ != nullptr && length_ != 0) {
+    this->value_.pointer_value_ = new char[this->length_];
+    memcpy(this->value_.pointer_value_, other.value_.pointer_value_, this->length_);
+  }
+}
+
 const char *Value::data() const
 {
   switch (attr_type_) {
-    case AttrType::CHARS: {
+    case AttrType::CHARS:
+    case AttrType::VECTORS: {
       return value_.pointer_value_;
     } break;
     default: {

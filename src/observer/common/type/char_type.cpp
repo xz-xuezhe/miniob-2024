@@ -31,8 +31,7 @@ RC CharType::set_value_from_str(Value &val, const string &data) const
 RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
 {
   switch (type) {
-    case AttrType::DATES:
-    {
+    case AttrType::DATES: {
       result.attr_type_ = type;
       int y, m, d;
       if (sscanf(val.value_.pointer_value_, "%d-%d-%d", &y, &m, &d) != 3 || !common::check_date(y, m, d)) {
@@ -40,7 +39,55 @@ RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
         return RC::INVALID_ARGUMENT;
       }
       result.set_date(y, m, d);
-    }break;
+    } break;
+    case AttrType::VECTORS: {
+      result.attr_type_ = type;
+      int8_t has_float  = 0;
+      string s          = val.to_string();
+      for (const char &c : s)
+        if (c == '.') {
+          has_float = 1;
+          break;
+        }
+      istringstream sin(s);
+      char          c;
+      sin >> c;
+      if (c != '[')
+        return RC::INVALID_ARGUMENT;
+      if (has_float) {
+        float         x;
+        vector<float> v;
+        while (c != ']') {
+          if (!(sin >> x))
+            return RC::INVALID_ARGUMENT;
+          v.push_back(x);
+          if (!(sin >> c) || !(c == ',' || c == ']'))
+            return RC::INVALID_ARGUMENT;
+        }
+        char *data = new char[sizeof(float) * v.size() + 1];
+        *data      = has_float;
+        memcpy(data + 1, v.data(), sizeof(float) * v.size());
+        result.set_vector(data, sizeof(float) * v.size() + 1);
+        delete[] data;
+        data = nullptr;
+      } else {
+        int32_t         x;
+        vector<int32_t> v;
+        while (c != ']') {
+          if (!(sin >> x))
+            return RC::INVALID_ARGUMENT;
+          v.push_back(x);
+          if (!(sin >> c) || !(c == ',' || c == ']'))
+            return RC::INVALID_ARGUMENT;
+        }
+        char *data = new char[sizeof(int32_t) * v.size() + 1];
+        *data      = has_float;
+        memcpy(data + 1, v.data(), sizeof(int32_t) * v.size());
+        result.set_vector(data, sizeof(int32_t) * v.size() + 1);
+        delete[] data;
+        data = nullptr;
+      }
+    } break;
     default: return RC::UNIMPLEMENTED;
   }
   return RC::SUCCESS;
@@ -52,6 +99,9 @@ int CharType::cast_cost(AttrType type)
     return 0;
   }
   if (type == AttrType::DATES) {
+    return 1;
+  }
+  if (type == AttrType::VECTORS) {
     return 1;
   }
   return INT32_MAX;

@@ -341,12 +341,20 @@ attr_def_list:
     ;
     
 attr_def:
-    ID type LBRACE number RBRACE 
+    ID STRING_T LBRACE number RBRACE 
     {
       $$ = new AttrInfoSqlNode;
-      $$->type = (AttrType)$2;
+      $$->type = AttrType::CHARS;
       $$->name = $1;
       $$->length = $4;
+      free($1);
+    }
+    | ID VECTOR_T LBRACE number RBRACE
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = AttrType::VECTORS;
+      $$->name = $1;
+      $$->length = 1 + 4 * $4;
       free($1);
     }
     | ID type
@@ -366,7 +374,6 @@ type:
     | STRING_T { $$ = static_cast<int>(AttrType::CHARS); }
     | FLOAT_T  { $$ = static_cast<int>(AttrType::FLOATS); }
     | DATE_T   { $$ = static_cast<int>(AttrType::DATES); }
-    | VECTOR_T { $$ = static_cast<int>(AttrType::VECTORS); }
     ;
 insert_stmt:        /*insert   语句的语法解析树*/
     INSERT INTO ID VALUES LBRACE value value_list RBRACE 
