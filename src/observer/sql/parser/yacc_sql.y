@@ -540,7 +540,6 @@ expression:
     | '*' {
       $$ = new StarExpr();
     }
-    // your code here
     ;
 
 rel_attr:
@@ -625,11 +624,14 @@ comp_op:
     | NL { $$ = NOT_LIKE; }
     ;
 
-// your code here
 group_by:
     /* empty */
     {
       $$ = nullptr;
+    }
+    | GROUP BY expression_list
+    {
+      $$ = $3;
     }
     ;
 load_data_stmt:
