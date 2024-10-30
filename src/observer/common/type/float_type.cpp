@@ -27,17 +27,26 @@ int FloatType::compare(const Value &left, const Value &right) const
 
 RC FloatType::add(const Value &left, const Value &right, Value &result) const
 {
-  result.set_float(left.get_float() + right.get_float());
+  if (left.get_float() == numeric_limits<float>::max() || right.get_float() == numeric_limits<float>::max())
+    result.set_float(numeric_limits<float>::max());
+  else
+    result.set_float(left.get_float() + right.get_float());
   return RC::SUCCESS;
 }
 RC FloatType::subtract(const Value &left, const Value &right, Value &result) const
 {
-  result.set_float(left.get_float() - right.get_float());
+  if (left.get_float() == numeric_limits<float>::max() || right.get_float() == numeric_limits<float>::max())
+    result.set_float(numeric_limits<float>::max());
+  else
+    result.set_float(left.get_float() - right.get_float());
   return RC::SUCCESS;
 }
 RC FloatType::multiply(const Value &left, const Value &right, Value &result) const
 {
-  result.set_float(left.get_float() * right.get_float());
+  if (left.get_float() == numeric_limits<float>::max() || right.get_float() == numeric_limits<float>::max())
+    result.set_float(numeric_limits<float>::max());
+  else
+    result.set_float(left.get_float() * right.get_float());
   return RC::SUCCESS;
 }
 
@@ -55,7 +64,10 @@ RC FloatType::divide(const Value &left, const Value &right, Value &result) const
 
 RC FloatType::negative(const Value &val, Value &result) const
 {
-  result.set_float(-val.get_float());
+  if (val.get_float() == numeric_limits<float>::max())
+    result.set_float(numeric_limits<float>::max());
+  else
+    result.set_float(-val.get_float());
   return RC::SUCCESS;
 }
 
