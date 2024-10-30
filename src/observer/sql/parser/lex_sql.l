@@ -127,6 +127,9 @@ SUM                                     yylval->string=strdup(yytext); RETURN_TO
 AVG                                     yylval->string=strdup(yytext); RETURN_TOKEN(AGGREGATE);
 MAX                                     yylval->string=strdup(yytext); RETURN_TOKEN(AGGREGATE);
 MIN                                     yylval->string=strdup(yytext); RETURN_TOKEN(AGGREGATE);
+L2_DISTANCE                             RETURN_TOKEN(L2_DISTANCE);
+COSINE_DISTANCE                         RETURN_TOKEN(COSINE_DISTANCE);
+INNER_PRODUCT                           RETURN_TOKEN(INNER_PRODUCT);
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 "("                                     RETURN_TOKEN(LBRACE);
 ")"                                     RETURN_TOKEN(RBRACE);

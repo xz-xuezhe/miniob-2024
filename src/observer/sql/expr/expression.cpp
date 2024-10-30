@@ -16,7 +16,6 @@ See the Mulan PSL v2 for more details. */
 #include "common/type/attr_type.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
-#include <limits>
 
 using namespace std;
 
@@ -646,4 +645,99 @@ RC AggregateExpr::type_from_string(const char *type_str, AggregateExpr::Type &ty
     rc = RC::INVALID_ARGUMENT;
   }
   return rc;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+FunctionExpr::FunctionExpr(FunctionExpr::Type type, Expression *left, Expression *right)
+    : function_type_(type), left_(left), right_(right)
+{}
+FunctionExpr::FunctionExpr(FunctionExpr::Type type, unique_ptr<Expression> left, unique_ptr<Expression> right)
+    : function_type_(type), left_(std::move(left)), right_(std::move(right))
+{}
+
+bool FunctionExpr::equal(const Expression &other) const
+{
+  if (this == &other) {
+    return true;
+  }
+  if (type() != other.type()) {
+    return false;
+  }
+  auto &other_func_expr = static_cast<const FunctionExpr &>(other);
+  return function_type_ == other_func_expr.function_type() && left_->equal(*other_func_expr.left_) &&
+         right_->equal(*other_func_expr.right_);
+}
+AttrType FunctionExpr::value_type() const { return AttrType::FLOATS; }
+
+RC FunctionExpr::calc_value(const Value &left, const Value &right, Value &value) const
+{
+  RC rc = RC::SUCCESS;
+
+  const AttrType target_type = value_type();
+  value.set_type(target_type);
+
+  switch (function_type_) {
+    case Type::L2_DISTANCE: {
+      rc = DataType::type_instance(AttrType::VECTORS)->l2_distance(left, right, value);
+    } break;
+
+    case Type::COSINE_DISTANCE: {
+      rc = DataType::type_instance(AttrType::VECTORS)->cosine_distance(left, right, value);
+    } break;
+
+    case Type::INNER_PRODUCT: {
+      rc = DataType::type_instance(AttrType::VECTORS)->inner_product(left, right, value);
+    } break;
+
+    default: {
+      rc = RC::INTERNAL;
+      LOG_WARN("unsupported function type. %d", function_type_);
+    } break;
+  }
+  return rc;
+}
+
+RC FunctionExpr::get_value(const Tuple &tuple, Value &value) const
+{
+  RC rc = RC::SUCCESS;
+
+  Value left_value;
+  Value right_value;
+
+  rc = left_->get_value(tuple, left_value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+    return rc;
+  }
+  rc = right_->get_value(tuple, right_value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+    return rc;
+  }
+  return calc_value(left_value, right_value, value);
+}
+
+RC FunctionExpr::try_get_value(Value &value) const
+{
+  RC rc = RC::SUCCESS;
+
+  Value left_value;
+  Value right_value;
+
+  rc = left_->try_get_value(left_value);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  if (right_) {
+    rc = right_->try_get_value(right_value);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get value of right expression. rc=%s", strrc(rc));
+      return rc;
+    }
+  }
+
+  return calc_value(left_value, right_value, value);
 }

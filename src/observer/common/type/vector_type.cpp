@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "common/type/vector_type.h"
 #include "common/value.h"
+#include <cmath>
 
 struct Numeric
 {
@@ -78,7 +79,8 @@ int VectorType::compare(const Value &left, const Value &right) const
   return 0;
 }
 
-RC VectorType::add(const Value &left, const Value &right, Value &result) const {
+RC VectorType::add(const Value &left, const Value &right, Value &result) const
+{
   RC           rc        = RC::SUCCESS;
   const Value *left_ptr  = &left;
   const Value *right_ptr = &right;
@@ -126,7 +128,8 @@ RC VectorType::add(const Value &left, const Value &right, Value &result) const {
   return rc;
 }
 
-RC VectorType::subtract(const Value &left, const Value &right, Value &result) const {
+RC VectorType::subtract(const Value &left, const Value &right, Value &result) const
+{
   RC           rc        = RC::SUCCESS;
   const Value *left_ptr  = &left;
   const Value *right_ptr = &right;
@@ -174,7 +177,8 @@ RC VectorType::subtract(const Value &left, const Value &right, Value &result) co
   return rc;
 }
 
-RC VectorType::multiply(const Value &left, const Value &right, Value &result) const {
+RC VectorType::multiply(const Value &left, const Value &right, Value &result) const
+{
   RC           rc        = RC::SUCCESS;
   const Value *left_ptr  = &left;
   const Value *right_ptr = &right;
@@ -215,6 +219,139 @@ RC VectorType::multiply(const Value &left, const Value &right, Value &result) co
           get_element_at(left_ptr->data(), i).get_int() * get_element_at(right_ptr->data(), i).get_int();
   }
   result.set_vector(data, 1 + left_length * element_size);
+  if (&left != left_ptr)
+    delete left_ptr;
+  if (&right != right_ptr)
+    delete right_ptr;
+  return rc;
+}
+
+RC VectorType::l2_distance(const Value &left, const Value &right, Value &result) const
+{
+  RC           rc        = RC::SUCCESS;
+  const Value *left_ptr  = &left;
+  const Value *right_ptr = &right;
+  if (left.attr_type() != AttrType::VECTORS) {
+    Value *new_left = new Value;
+    rc              = Value::cast_to(left, AttrType::VECTORS, *new_left);
+    if (rc != RC::SUCCESS) {
+      delete new_left;
+      return rc;
+    }
+    left_ptr = new_left;
+  }
+  if (right.attr_type() != AttrType::VECTORS) {
+    Value *new_right = new Value;
+    rc               = Value::cast_to(right, AttrType::VECTORS, *new_right);
+    if (rc != RC::SUCCESS) {
+      if (&left != left_ptr)
+        delete left_ptr;
+      delete new_right;
+      return rc;
+    }
+    right_ptr = new_right;
+  }
+  int left_length  = get_length(left_ptr->data(), left_ptr->length());
+  int right_length = get_length(right_ptr->data(), right_ptr->length());
+  if (left_length != right_length)
+    return RC::INVALID_ARGUMENT;
+  float sum = 0;
+  for (int i = 0; i < left_length; i++) {
+    float value_left  = get_element_at(left_ptr->data(), i).get_float();
+    float value_right = get_element_at(right_ptr->data(), i).get_float();
+    sum += (value_left - value_right) * (value_left - value_right);
+  }
+  result.set_float(std::sqrt(sum));
+  if (&left != left_ptr)
+    delete left_ptr;
+  if (&right != right_ptr)
+    delete right_ptr;
+  return rc;
+}
+
+RC VectorType::cosine_distance(const Value &left, const Value &right, Value &result) const
+{
+  RC           rc        = RC::SUCCESS;
+  const Value *left_ptr  = &left;
+  const Value *right_ptr = &right;
+  if (left.attr_type() != AttrType::VECTORS) {
+    Value *new_left = new Value;
+    rc              = Value::cast_to(left, AttrType::VECTORS, *new_left);
+    if (rc != RC::SUCCESS) {
+      delete new_left;
+      return rc;
+    }
+    left_ptr = new_left;
+  }
+  if (right.attr_type() != AttrType::VECTORS) {
+    Value *new_right = new Value;
+    rc               = Value::cast_to(right, AttrType::VECTORS, *new_right);
+    if (rc != RC::SUCCESS) {
+      if (&left != left_ptr)
+        delete left_ptr;
+      delete new_right;
+      return rc;
+    }
+    right_ptr = new_right;
+  }
+  int left_length  = get_length(left_ptr->data(), left_ptr->length());
+  int right_length = get_length(right_ptr->data(), right_ptr->length());
+  if (left_length != right_length)
+    return RC::INVALID_ARGUMENT;
+  float sum_dot   = 0;
+  float sum_left  = 0;
+  float sum_right = 0;
+  for (int i = 0; i < left_length; i++) {
+    float value_left  = get_element_at(left_ptr->data(), i).get_float();
+    float value_right = get_element_at(right_ptr->data(), i).get_float();
+    sum_dot += value_left * value_right;
+    sum_left += value_left * value_left;
+    sum_right += value_right * value_right;
+  }
+  result.set_float(1 - sum_dot / std::sqrt(sum_left * sum_right));
+  if (&left != left_ptr)
+    delete left_ptr;
+  if (&right != right_ptr)
+    delete right_ptr;
+  return rc;
+}
+
+RC VectorType::inner_product(const Value &left, const Value &right, Value &result) const
+{
+  RC           rc        = RC::SUCCESS;
+  const Value *left_ptr  = &left;
+  const Value *right_ptr = &right;
+  if (left.attr_type() != AttrType::VECTORS) {
+    Value *new_left = new Value;
+    rc              = Value::cast_to(left, AttrType::VECTORS, *new_left);
+    if (rc != RC::SUCCESS) {
+      delete new_left;
+      return rc;
+    }
+    left_ptr = new_left;
+  }
+  if (right.attr_type() != AttrType::VECTORS) {
+    Value *new_right = new Value;
+    rc               = Value::cast_to(right, AttrType::VECTORS, *new_right);
+    if (rc != RC::SUCCESS) {
+      if (&left != left_ptr)
+        delete left_ptr;
+      delete new_right;
+      return rc;
+    }
+    right_ptr = new_right;
+  }
+  int left_length  = get_length(left_ptr->data(), left_ptr->length());
+  int right_length = get_length(right_ptr->data(), right_ptr->length());
+  if (left_length != right_length)
+    return RC::INVALID_ARGUMENT;
+  float sum = 0;
+  for (int i = 0; i < left_length; i++) {
+    float value_left  = get_element_at(left_ptr->data(), i).get_float();
+    float value_right = get_element_at(right_ptr->data(), i).get_float();
+    sum += value_left * value_right;
+  }
+  result.set_float(sum);
   if (&left != left_ptr)
     delete left_ptr;
   if (&right != right_ptr)

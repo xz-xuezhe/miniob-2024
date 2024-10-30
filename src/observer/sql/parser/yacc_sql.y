@@ -115,6 +115,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NE
         LK
         NL
+        L2_DISTANCE
+        COSINE_DISTANCE
+        INNER_PRODUCT
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -511,7 +514,19 @@ expression_list:
     }
     ;
 expression:
-    expression '+' expression {
+    L2_DISTANCE LBRACE expression COMMA expression RBRACE {
+      $$ = new FunctionExpr(FunctionExpr::Type::L2_DISTANCE, $3, $5);
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    | COSINE_DISTANCE LBRACE expression COMMA expression RBRACE {
+      $$ = new FunctionExpr(FunctionExpr::Type::COSINE_DISTANCE, $3, $5);
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    | INNER_PRODUCT LBRACE expression COMMA expression RBRACE {
+      $$ = new FunctionExpr(FunctionExpr::Type::INNER_PRODUCT, $3, $5);
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    | expression '+' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
     }
     | expression '-' expression {

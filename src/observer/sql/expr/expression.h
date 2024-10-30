@@ -40,13 +40,14 @@ enum class ExprType
   UNBOUND_FIELD,        ///< 未绑定的字段，需要在resolver阶段解析为FieldExpr
   UNBOUND_AGGREGATION,  ///< 未绑定的聚合函数，需要在resolver阶段解析为AggregateExpr
 
-  FIELD,        ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
-  VALUE,        ///< 常量值
-  CAST,         ///< 需要做类型转换的表达式
-  COMPARISON,   ///< 需要做比较的表达式
-  CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
-  ARITHMETIC,   ///< 算术运算
-  AGGREGATION,  ///< 聚合运算
+  FIELD,            ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
+  VALUE,            ///< 常量值
+  CAST,             ///< 需要做类型转换的表达式
+  COMPARISON,       ///< 需要做比较的表达式
+  CONJUNCTION,      ///< 多个表达式使用同一种关系(AND或OR)来联结
+  ARITHMETIC,       ///< 算术运算
+  AGGREGATION,      ///< 聚合运算
+  FUNCTION,         ///< 向量函数
 };
 
 /**
@@ -467,4 +468,42 @@ public:
 private:
   Type                        aggregate_type_;
   std::unique_ptr<Expression> child_;
+};
+
+class FunctionExpr : public Expression
+{
+public:
+  enum class Type
+  {
+    L2_DISTANCE,
+    COSINE_DISTANCE,
+    INNER_PRODUCT
+  };
+
+public:
+  FunctionExpr(Type type, Expression *left, Expression *right);
+  FunctionExpr(Type type, std::unique_ptr<Expression> left, std::unique_ptr<Expression> right);
+  virtual ~FunctionExpr() = default;
+
+  bool     equal(const Expression &other) const override;
+  ExprType type() const override { return ExprType::FUNCTION; }
+
+  AttrType value_type() const override;
+
+  RC get_value(const Tuple &tuple, Value &value) const override;
+
+  RC try_get_value(Value &value) const override;
+
+  Type function_type() const { return function_type_; }
+
+  std::unique_ptr<Expression> &left() { return left_; }
+  std::unique_ptr<Expression> &right() { return right_; }
+
+private:
+  RC calc_value(const Value &left_value, const Value &right_value, Value &value) const;
+
+private:
+  Type                        function_type_;
+  std::unique_ptr<Expression> left_;
+  std::unique_ptr<Expression> right_;
 };

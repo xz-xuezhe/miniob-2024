@@ -81,7 +81,8 @@ RC DefaultConditionFilter::init(Table &table, ConditionSqlNode &condition)
       case ExprType::COMPARISON:
       case ExprType::CONJUNCTION:
       case ExprType::ARITHMETIC:
-      case ExprType::AGGREGATION: {
+      case ExprType::AGGREGATION:
+      case ExprType::FUNCTION: {
         // Do nothing
       } break;
       default: {

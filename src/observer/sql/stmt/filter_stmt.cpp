@@ -116,17 +116,15 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
       case ExprType::COMPARISON:
       case ExprType::CONJUNCTION:
       case ExprType::ARITHMETIC:
-      case ExprType::AGGREGATION: {
+      case ExprType::AGGREGATION:
+      case ExprType::FUNCTION: {
         // Do nothing
       } break;
       default: {
         ASSERT(false, "Unknown expression type");
       }
     }
-    rc = ExpressionIterator::iterate_child_expr(*expr, binder);
-    if (OB_FAIL(rc))
-      return rc;
-    return rc;
+    return ExpressionIterator::iterate_child_expr(*expr, binder);
   };
 
   rc = binder(condition->left);
