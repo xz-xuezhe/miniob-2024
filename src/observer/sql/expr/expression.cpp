@@ -13,8 +13,10 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/expr/expression.h"
+#include "common/type/attr_type.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
+#include <limits>
 
 using namespace std;
 
@@ -151,6 +153,11 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
       result = f.back();
     else
       result = !f.back();
+    return RC::SUCCESS;
+  }
+  if ((left.attr_type() == AttrType::FLOATS && left.get_float() == numeric_limits<float>::max()) ||
+      (right.attr_type() == AttrType::FLOATS && right.get_float() == numeric_limits<float>::max())) {
+    result = false;
     return RC::SUCCESS;
   }
   RC  rc         = RC::SUCCESS;
