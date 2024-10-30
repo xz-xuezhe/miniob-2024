@@ -53,16 +53,18 @@ public:
 
   CompOp comp() const { return comp_; }
 
-  void set_left(const FilterObj &obj) { left_ = obj; }
-  void set_right(const FilterObj &obj) { right_ = obj; }
+  void set_left(std::unique_ptr<Expression> obj) { left_ = std::move(obj); }
+  void set_right(std::unique_ptr<Expression> obj) { right_ = std::move(obj); }
 
-  const FilterObj &left() const { return left_; }
-  const FilterObj &right() const { return right_; }
+  std::unique_ptr<Expression> &      left() { return left_; }
+  std::unique_ptr<Expression> &      right() { return right_; }
+  const std::unique_ptr<Expression> &left() const { return left_; }
+  const std::unique_ptr<Expression> &right() const { return right_; }
 
 private:
-  CompOp    comp_ = NO_OP;
-  FilterObj left_;
-  FilterObj right_;
+  CompOp                      comp_  = NO_OP;
+  std::unique_ptr<Expression> left_  = nullptr;
+  std::unique_ptr<Expression> right_ = nullptr;
 };
 
 /**
@@ -80,10 +82,10 @@ public:
 
 public:
   static RC create(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-      const ConditionSqlNode *conditions, int condition_num, FilterStmt *&stmt);
+      std::unique_ptr<ConditionSqlNode> *conditions, int condition_num, FilterStmt *&stmt);
 
   static RC create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-      const ConditionSqlNode &condition, FilterUnit *&filter_unit);
+      std::unique_ptr<ConditionSqlNode> &condition, FilterUnit *&filter_unit);
 
 private:
   std::vector<FilterUnit *> filter_units_;  // 默认当前都是AND关系

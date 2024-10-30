@@ -32,7 +32,7 @@ public:
   UpdateStmt(Table *table, const FieldMeta *field_meta, const Value *value, FilterStmt *filter_stmt);
 
 public:
-  static RC create(Db *db, const UpdateSqlNode &update_sql, Stmt *&stmt);
+  static RC create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt);
 
 public:
   Table *          table() const { return table_; }

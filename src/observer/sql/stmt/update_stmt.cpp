@@ -23,7 +23,7 @@ UpdateStmt::UpdateStmt(Table *table, const FieldMeta *field_meta, const Value *v
     : table_(table), field_meta_(field_meta), value_(value), filter_stmt_(filter_stmt)
 {}
 
-RC UpdateStmt::create(Db *db, const UpdateSqlNode &update, Stmt *&stmt)
+RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
 {
   const char *table_name = update.relation_name.c_str();
   const char *field_name = update.attribute_name.c_str();

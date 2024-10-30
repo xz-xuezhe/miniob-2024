@@ -66,15 +66,10 @@ enum CompOp
  */
 struct ConditionSqlNode
 {
-  int left_is_attr;              ///< TRUE if left-hand side is an attribute
-                                 ///< 1时，操作符左边是属性名，0时，是属性值
-  Value          left_value;     ///< left-hand side value if left_is_attr = FALSE
-  RelAttrSqlNode left_attr;      ///< left-hand side attribute
-  CompOp         comp;           ///< comparison operator
-  int            right_is_attr;  ///< TRUE if right-hand side is an attribute
-                                 ///< 1时，操作符右边是属性名，0时，是属性值
-  RelAttrSqlNode right_attr;     ///< right-hand side attribute if right_is_attr = TRUE 右边的属性
-  Value          right_value;    ///< right-hand side value if right_is_attr = FALSE
+  CompOp      comp;   ///< comparison operator
+  std::unique_ptr<Expression> left;   ///< left-hand side expression
+  std::unique_ptr<Expression> right;  ///< right-hand side expression
+  
 };
 
 /**
@@ -90,10 +85,10 @@ struct ConditionSqlNode
 
 struct SelectSqlNode
 {
-  std::vector<std::unique_ptr<Expression>> expressions;  ///< 查询的表达式
-  std::vector<std::string>                 relations;    ///< 查询的表
-  std::vector<ConditionSqlNode>            conditions;   ///< 查询条件，使用AND串联起来多个条件
-  std::vector<std::unique_ptr<Expression>> group_by;     ///< group by clause
+  std::vector<std::unique_ptr<Expression>>       expressions;  ///< 查询的表达式
+  std::vector<std::string>                       relations;    ///< 查询的表
+  std::vector<std::unique_ptr<ConditionSqlNode>> conditions;   ///< 查询条件，使用AND串联起来多个条件
+  std::vector<std::unique_ptr<Expression>>       group_by;     ///< group by clause
 };
 
 /**
@@ -122,8 +117,8 @@ struct InsertSqlNode
  */
 struct DeleteSqlNode
 {
-  std::string                   relation_name;  ///< Relation to delete from
-  std::vector<ConditionSqlNode> conditions;
+  std::string                                    relation_name;  ///< Relation to delete from
+  std::vector<std::unique_ptr<ConditionSqlNode>> conditions;
 };
 
 /**
@@ -132,10 +127,10 @@ struct DeleteSqlNode
  */
 struct UpdateSqlNode
 {
-  std::string                   relation_name;   ///< Relation to update
-  std::string                   attribute_name;  ///< 更新的字段，仅支持一个字段
-  Value                         value;           ///< 更新的值，仅支持一个字段
-  std::vector<ConditionSqlNode> conditions;
+  std::string                                    relation_name;   ///< Relation to update
+  std::string                                    attribute_name;  ///< 更新的字段，仅支持一个字段
+  Value                                          value;           ///< 更新的值，仅支持一个字段
+  std::vector<std::unique_ptr<ConditionSqlNode>> conditions;
 };
 
 /**

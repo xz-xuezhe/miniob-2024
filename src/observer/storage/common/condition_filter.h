@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "sql/parser/parse.h"
+#include "sql/expr/tuple.h"
 
 class Record;
 class Table;
@@ -37,7 +38,7 @@ public:
    * @param rec
    * @return true means match condition, false means failed to match.
    */
-  virtual bool filter(const Record &rec) const = 0;
+  virtual bool filter(Record &rec) const = 0;
 };
 
 class DefaultConditionFilter : public ConditionFilter
@@ -46,23 +47,24 @@ public:
   DefaultConditionFilter();
   virtual ~DefaultConditionFilter();
 
-  RC init(const ConDesc &left, const ConDesc &right, AttrType attr_type, CompOp comp_op);
-  RC init(Table &table, const ConditionSqlNode &condition);
+  RC init(std::unique_ptr<Expression> left, std::unique_ptr<Expression> right, AttrType attr_type, CompOp comp_op, std::unique_ptr<RowTuple> tuple);
+  RC init(Table &table, ConditionSqlNode &condition);
 
-  virtual bool filter(const Record &rec) const;
+  virtual bool filter(Record &rec) const;
 
 public:
-  const ConDesc &left() const { return left_; }
-  const ConDesc &right() const { return right_; }
+  const std::unique_ptr<Expression> &left() const { return left_; }
+  const std::unique_ptr<Expression> &right() const { return right_; }
 
   CompOp   comp_op() const { return comp_op_; }
   AttrType attr_type() const { return attr_type_; }
 
 private:
-  ConDesc  left_;
-  ConDesc  right_;
-  AttrType attr_type_ = AttrType::UNDEFINED;
-  CompOp   comp_op_   = NO_OP;
+  std::unique_ptr<Expression> left_  = nullptr;
+  std::unique_ptr<Expression> right_ = nullptr;
+  AttrType                    attr_type_ = AttrType::UNDEFINED;
+  CompOp                      comp_op_   = NO_OP;
+  std::unique_ptr<RowTuple>   tuple_;
 };
 
 class CompositeConditionFilter : public ConditionFilter
@@ -72,9 +74,9 @@ public:
   virtual ~CompositeConditionFilter();
 
   RC init(const ConditionFilter *filters[], int filter_num);
-  RC init(Table &table, const ConditionSqlNode *conditions, int condition_num);
+  RC init(Table &table, ConditionSqlNode *conditions, int condition_num);
 
-  virtual bool filter(const Record &rec) const;
+  virtual bool filter(Record &rec) const;
 
 public:
   int                    filter_num() const { return filter_num_; }

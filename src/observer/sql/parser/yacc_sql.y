@@ -118,22 +118,22 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
-  ParsedSqlNode *                            sql_node;
-  ConditionSqlNode *                         condition;
-  Value *                                    value;
-  enum CompOp                                comp;
-  RelAttrSqlNode *                           rel_attr;
-  std::vector<AttrInfoSqlNode> *             attr_infos;
-  AttrInfoSqlNode *                          attr_info;
-  Expression *                               expression;
-  std::vector<std::unique_ptr<Expression>> * expression_list;
-  std::vector<Value> *                       value_list;
-  std::vector<ConditionSqlNode> *            condition_list;
-  std::vector<RelAttrSqlNode> *              rel_attr_list;
-  std::vector<std::string> *                 relation_list;
-  char *                                     string;
-  int                                        number;
-  float                                      floats;
+  ParsedSqlNode *                                  sql_node;
+  ConditionSqlNode *                               condition;
+  Value *                                          value;
+  enum CompOp                                      comp;
+  RelAttrSqlNode *                                 rel_attr;
+  std::vector<AttrInfoSqlNode> *                   attr_infos;
+  AttrInfoSqlNode *                                attr_info;
+  Expression *                                     expression;
+  std::vector<std::unique_ptr<Expression>> *       expression_list;
+  std::vector<Value> *                             value_list;
+  std::vector<std::unique_ptr<ConditionSqlNode>> * condition_list;
+  std::vector<RelAttrSqlNode> *                    rel_attr_list;
+  std::vector<std::string> *                       relation_list;
+  char *                                           string;
+  int                                              number;
+  float                                            floats;
 }
 
 %token <number> NUMBER
@@ -592,64 +592,21 @@ condition_list:
       $$ = nullptr;
     }
     | condition {
-      $$ = new std::vector<ConditionSqlNode>;
-      $$->emplace_back(*$1);
-      delete $1;
+      $$ = new std::vector<std::unique_ptr<ConditionSqlNode>>;
+      $$->emplace_back($1);
     }
     | condition AND condition_list {
       $$ = $3;
-      $$->emplace_back(*$1);
-      delete $1;
+      $$->emplace_back($1);
     }
     ;
 condition:
-    rel_attr comp_op value
+    expression comp_op expression
     {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | value comp_op value 
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
-      $$->left_value = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | rel_attr comp_op rel_attr
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 1;
-      $$->right_attr = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | value comp_op rel_attr
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
-      $$->left_value = *$1;
-      $$->right_is_attr = 1;
-      $$->right_attr = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
+      $$        = new ConditionSqlNode;
+      $$->comp  = $2;
+      $$->left  = std::unique_ptr<Expression>($1);
+      $$->right = std::unique_ptr<Expression>($3);
     }
     ;
 

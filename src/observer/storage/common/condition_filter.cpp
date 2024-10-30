@@ -17,6 +17,8 @@ See the Mulan PSL v2 for more details. */
 #include "common/value.h"
 #include "storage/record/record_manager.h"
 #include "storage/table/table.h"
+#include "sql/expr/expression.h"
+#include "sql/expr/expression_iterator.h"
 #include <math.h>
 #include <stddef.h>
 
@@ -24,19 +26,10 @@ using namespace common;
 
 ConditionFilter::~ConditionFilter() {}
 
-DefaultConditionFilter::DefaultConditionFilter()
-{
-  left_.is_attr     = false;
-  left_.attr_length = 0;
-  left_.attr_offset = 0;
-
-  right_.is_attr     = false;
-  right_.attr_length = 0;
-  right_.attr_offset = 0;
-}
+DefaultConditionFilter::DefaultConditionFilter() {}
 DefaultConditionFilter::~DefaultConditionFilter() {}
 
-RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrType attr_type, CompOp comp_op)
+RC DefaultConditionFilter::init(std::unique_ptr<Expression> left, std::unique_ptr<Expression> right, AttrType attr_type, CompOp comp_op, std::unique_ptr<RowTuple> tuple)
 {
   if (attr_type <= AttrType::UNDEFINED || attr_type >= AttrType::MAXTYPE) {
     LOG_ERROR("Invalid condition with unsupported attribute type: %d", attr_type);
@@ -48,60 +41,66 @@ RC DefaultConditionFilter::init(const ConDesc &left, const ConDesc &right, AttrT
     return RC::INVALID_ARGUMENT;
   }
 
-  left_      = left;
-  right_     = right;
+  left_      = std::move(left);
+  right_     = std::move(right);
   attr_type_ = attr_type;
   comp_op_   = comp_op;
+  tuple_     = std::move(tuple);
   return RC::SUCCESS;
 }
 
-RC DefaultConditionFilter::init(Table &table, const ConditionSqlNode &condition)
+RC DefaultConditionFilter::init(Table &table, ConditionSqlNode &condition)
 {
-  const TableMeta &table_meta = table.table_meta();
-  ConDesc          left;
-  ConDesc          right;
-
-  AttrType type_left  = AttrType::UNDEFINED;
-  AttrType type_right = AttrType::UNDEFINED;
-
-  if (1 == condition.left_is_attr) {
-    left.is_attr                = true;
-    const FieldMeta *field_left = table_meta.field(condition.left_attr.attribute_name.c_str());
-    if (nullptr == field_left) {
-      LOG_WARN("No such field in condition. %s.%s", table.name(), condition.left_attr.attribute_name.c_str());
-      return RC::SCHEMA_FIELD_MISSING;
+  RC                                          rc         = RC::SUCCESS;
+  const TableMeta &                           table_meta = table.table_meta();
+  function<RC(std::unique_ptr<Expression> &)> binder     = [&](unique_ptr<Expression> &expr) -> RC {
+    RC rc = RC::SUCCESS;
+    switch (expr->type()) {
+      case ExprType::STAR: {
+        return RC::INVALID_ARGUMENT;
+      } break;
+      case ExprType::VALUE:
+      case ExprType::FIELD: {
+        return RC::SUCCESS;
+      } break;
+      case ExprType::UNBOUND_FIELD: {
+        const char *     field_name = static_cast<const UnboundFieldExpr &>(*expr).field_name();
+        const FieldMeta *field_meta = table_meta.field(field_name);
+        if (nullptr == field_meta) {
+          LOG_WARN("No such field in condition. %s.%s", table.name(), field_name);
+          return RC::SCHEMA_FIELD_MISSING;
+        }
+        if (OB_FAIL(rc))
+          return rc;
+        Field field(&table, field_meta);
+        expr.reset(new FieldExpr(field));
+        return rc;
+      } break;
+      case ExprType::NONE:
+      case ExprType::CAST:
+      case ExprType::COMPARISON:
+      case ExprType::CONJUNCTION:
+      case ExprType::ARITHMETIC:
+      case ExprType::AGGREGATION: {
+        // Do nothing
+      } break;
+      default: {
+        ASSERT(false, "Unknown expression type");
+      }
     }
-    left.attr_length = field_left->len();
-    left.attr_offset = field_left->offset();
-
-    type_left = field_left->type();
-  } else {
-    left.is_attr = false;
-    left.value   = condition.left_value;  // 校验type 或者转换类型
-    type_left    = condition.left_value.attr_type();
-
-    left.attr_length = 0;
-    left.attr_offset = 0;
-  }
-
-  if (1 == condition.right_is_attr) {
-    right.is_attr                = true;
-    const FieldMeta *field_right = table_meta.field(condition.right_attr.attribute_name.c_str());
-    if (nullptr == field_right) {
-      LOG_WARN("No such field in condition. %s.%s", table.name(), condition.right_attr.attribute_name.c_str());
-      return RC::SCHEMA_FIELD_MISSING;
-    }
-    right.attr_length = field_right->len();
-    right.attr_offset = field_right->offset();
-    type_right        = field_right->type();
-  } else {
-    right.is_attr = false;
-    right.value   = condition.right_value;
-    type_right    = condition.right_value.attr_type();
-
-    right.attr_length = 0;
-    right.attr_offset = 0;
-  }
+    rc = ExpressionIterator::iterate_child_expr(*expr, binder);
+    if (OB_FAIL(rc))
+      return rc;
+    return rc;
+  };
+  rc = binder(condition.left);
+  if (OB_FAIL(rc))
+    return rc;
+  rc = binder(condition.right);
+  if (OB_FAIL(rc))
+    return rc;
+  AttrType type_left  = condition.left->value_type();
+  AttrType type_right = condition.right->value_type();
 
   // 校验和转换
   //  if (!field_type_compare_compatible_table[type_left][type_right]) {
@@ -114,27 +113,23 @@ RC DefaultConditionFilter::init(Table &table, const ConditionSqlNode &condition)
     return RC::SCHEMA_FIELD_TYPE_MISMATCH;
   }
 
-  return init(left, right, type_left, condition.comp);
+  std::unique_ptr<RowTuple> tuple(new RowTuple);
+  tuple->set_schema(&table, table.table_meta().field_metas());
+
+  return init(std::move(condition.left), std::move(condition.right), type_left, condition.comp, std::move(tuple));
 }
 
-bool DefaultConditionFilter::filter(const Record &rec) const
+bool DefaultConditionFilter::filter(Record &rec) const
 {
+  RC rc = RC::SUCCESS;
+  tuple_->set_record(&rec);
   Value left_value;
   Value right_value;
-
-  if (left_.is_attr) {  // value
-    left_value.set_type(attr_type_);
-    left_value.set_data(rec.data() + left_.attr_offset, left_.attr_length);
-  } else {
-    left_value.set_value(left_.value);
-  }
-
-  if (right_.is_attr) {
-    right_value.set_type(attr_type_);
-    right_value.set_data(rec.data() + right_.attr_offset, right_.attr_length);
-  } else {
-    right_value.set_value(right_.value);
-  }
+  rc = left_->get_value(*tuple_, left_value);
+  ASSERT(rc == RC::SUCCESS, "Failed to get left_value");
+  rc = right_->get_value(*tuple_, right_value);
+  ASSERT(rc == RC::SUCCESS, "Failed to get right_value");
+  tuple_->set_record(nullptr);
 
   int cmp_result = left_value.compare(right_value);
 
@@ -173,7 +168,7 @@ RC CompositeConditionFilter::init(const ConditionFilter *filters[], int filter_n
   return init(filters, filter_num, false);
 }
 
-RC CompositeConditionFilter::init(Table &table, const ConditionSqlNode *conditions, int condition_num)
+RC CompositeConditionFilter::init(Table &table, ConditionSqlNode *conditions, int condition_num)
 {
   if (condition_num == 0) {
     return RC::SUCCESS;
@@ -202,7 +197,7 @@ RC CompositeConditionFilter::init(Table &table, const ConditionSqlNode *conditio
   return init((const ConditionFilter **)condition_filters, condition_num, true);
 }
 
-bool CompositeConditionFilter::filter(const Record &rec) const
+bool CompositeConditionFilter::filter(Record &rec) const
 {
   for (int i = 0; i < filter_num_; i++) {
     if (!filters_[i]->filter(rec)) {

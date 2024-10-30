@@ -16,6 +16,21 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "sql/expr/expression.h"
 
+// ConditionSqlNode::ConditionSqlNode(CompOp comp, Expression *left, Expression *right)
+//     : comp(comp), left(left), right(right)
+// {}
+// ConditionSqlNode::ConditionSqlNode(ConditionSqlNode &&other)
+//     : comp(other.comp), left(std::move(other.left)), right(std::move(other.right))
+// {}
+// ConditionSqlNode::~ConditionSqlNode()       = default;
+// ConditionSqlNode &ConditionSqlNode::operator=(ConditionSqlNode &&other)
+// {
+//   comp  = other.comp;
+//   left  = std::move(other.left);
+//   right = std::move(other.right);
+//   return *this;
+// }
+
 RC parse(char *st, ParsedSqlNode *sqln);
 
 ParsedSqlNode::ParsedSqlNode() : flag(SCF_ERROR) {}
