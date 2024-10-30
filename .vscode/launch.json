@@ -20,11 +20,7 @@
                 {
                     "description": "Pretty Printing",
                     "text": "-enable-pretty-printing"
-                },
-                // {
-                //     "description": "No std::",
-                //     "text": "-interpreter-exec console \"skip -rfu std::.*\""
-                // }
+                }
             ]
         },
         {

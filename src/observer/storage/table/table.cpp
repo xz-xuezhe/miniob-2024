@@ -21,6 +21,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/algorithm.h"
 #include "common/log/log.h"
 #include "common/global_context.h"
+#include "common/rc.h"
 #include "storage/db/db.h"
 #include "storage/buffer/disk_buffer_pool.h"
 #include "storage/common/condition_filter.h"
@@ -319,8 +320,18 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
             table_meta_.name(), field->name(), value.to_string().c_str());
         break;
       }
+      if (real_value.length() != field->len()) {
+        LOG_WARN("the length of the record does not match the field. field name:%s,values:%s", field->name(), value.to_string().c_str());
+        rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+        break;
+      }
       rc = set_value_to_record(record_data, real_value, field);
     } else {
+      if (value.length() != field->len()) {
+        LOG_WARN("the length of the record does not match the field. field name:%s,values:%s", field->name(), value.to_string().c_str());
+        rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+        break;
+      }
       rc = set_value_to_record(record_data, value, field);
     }
   }
