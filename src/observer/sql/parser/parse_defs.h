@@ -146,6 +146,16 @@ struct AttrInfoSqlNode
 };
 
 /**
+ * @brief 描述 INNER JOIN 操作
+ * @ingroup SQLParser
+ */
+struct JoinSqlNode
+{
+  std::vector<std::string>                       relations;   ///< 查询的表
+  std::vector<std::unique_ptr<ConditionSqlNode>> conditions;  ///< 查询条件，使用AND串联起来多个条件
+};
+
+/**
  * @brief 描述一个create table语句
  * @ingroup SQLParser
  * @details 这里也做了很多简化。

@@ -99,6 +99,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         INTO
         VALUES
         FROM
+        INNER_JOIN
         WHERE
         AND
         SET
@@ -133,6 +134,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   Expression *                                     expression;
   std::vector<std::unique_ptr<Expression>> *       expression_list;
   std::vector<Value> *                             value_list;
+  JoinSqlNode *                                    join_list;
   std::vector<std::unique_ptr<ConditionSqlNode>> * condition_list;
   std::vector<RelAttrSqlNode> *                    rel_attr_list;
   std::vector<std::string> *                       relation_list;
@@ -159,6 +161,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <value_list>          value_list
+%type <join_list>           join_list
 %type <condition_list>      where
 %type <condition_list>      condition_list
 %type <string>              storage_format
@@ -475,7 +478,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list where group_by
+    SELECT expression_list FROM rel_list join_list where group_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -488,14 +491,20 @@ select_stmt:        /*  select 语句的语法解析树*/
         delete $4;
       }
 
-      if ($5 != nullptr) {
-        $$->selection.conditions.swap(*$5);
-        delete $5;
+      if ($6 != nullptr) {
+        $$->selection.conditions.swap(*$6);
+        delete $6;
       }
 
-      if ($6 != nullptr) {
-        $$->selection.group_by.swap(*$6);
-        delete $6;
+      if ($7 != nullptr) {
+        $$->selection.group_by.swap(*$7);
+        delete $7;
+      }
+
+      if ($5 != nullptr) {
+        $$->selection.relations.insert($$->selection.relations.end(), std::make_move_iterator($5->relations.begin()), std::make_move_iterator($5->relations.end()));
+        $$->selection.conditions.insert($$->selection.conditions.end(), std::make_move_iterator($5->conditions.begin()), std::make_move_iterator($5->conditions.end()));
+        delete $5;
       }
     }
     ;
@@ -612,6 +621,23 @@ rel_list:
       free($1);
     }
     ;
+
+join_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | join_list INNER_JOIN relation ON condition_list
+    {
+      if ($1 == nullptr)
+        $$ = new JoinSqlNode;
+      else
+        $$ = $1;
+      $$->relations.emplace_back($3);
+      $$->conditions.insert($$->conditions.end(), std::make_move_iterator($5->begin()), std::make_move_iterator($5->end()));
+      free($3);
+      delete $5;
+    }
 
 where:
     /* empty */
