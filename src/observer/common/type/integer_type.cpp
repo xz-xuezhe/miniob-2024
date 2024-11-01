@@ -35,7 +35,12 @@ RC IntegerType::cast_to(const Value &val, AttrType type, Value &result) const
     {
       result.attr_type_ = type;
       result.set_float(val.get_int());
-    }break;
+    } break;
+    case AttrType::CHARS:
+    {
+      result.attr_type_ = type;
+      result.set_string(val.to_string().c_str());
+    } break;
     default: return RC::UNIMPLEMENTED;
   }
   return RC::SUCCESS;
@@ -46,6 +51,9 @@ int IntegerType::cast_cost(AttrType type) {
     return 0;
   }
   if (type == AttrType::FLOATS) {
+    return 1;
+  }
+  if (type == AttrType::CHARS) {
     return 1;
   }
   return INT32_MAX;

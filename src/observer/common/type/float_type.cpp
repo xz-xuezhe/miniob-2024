@@ -25,6 +25,29 @@ int FloatType::compare(const Value &left, const Value &right) const
   return common::compare_float((void *)&left_val, (void *)&right_val);
 }
 
+RC FloatType::cast_to(const Value &val, AttrType type, Value &result) const
+{
+  switch (type) {
+    case AttrType::CHARS:
+    {
+      result.attr_type_ = type;
+      result.set_string(val.to_string().c_str());
+    } break;
+    default: return RC::UNIMPLEMENTED;
+  }
+  return RC::SUCCESS;
+}
+int FloatType::cast_cost(AttrType type)
+{
+  if (type == AttrType::FLOATS) {
+    return 0;
+  }
+  if (type == AttrType::CHARS) {
+    return 1;
+  }
+  return INT32_MAX;
+}
+
 RC FloatType::add(const Value &left, const Value &right, Value &result) const
 {
   if (left.get_float() == numeric_limits<float>::max() || right.get_float() == numeric_limits<float>::max())
