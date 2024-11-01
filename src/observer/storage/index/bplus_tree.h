@@ -64,17 +64,7 @@ public:
 
   int attr_length() const { return attr_length_; }
 
-  int operator()(const char *v1, const char *v2) const
-  {
-    // TODO: optimized the comparison
-    Value left;
-    left.set_type(attr_type_);
-    left.set_data(v1, attr_length_);
-    Value right;
-    right.set_type(attr_type_);
-    right.set_data(v2, attr_length_);
-    return DataType::type_instance(attr_type_)->compare(left, right);
-  }
+  int operator()(const char *v1, const char *v2) const { return memcmp(v1, v2, attr_length_); }
 
 private:
   AttrType attr_type_;
@@ -126,8 +116,18 @@ public:
 
   string operator()(const char *v) const
   {
-    Value value(attr_type_, const_cast<char *>(v), attr_length_);
-    return value.to_string();
+    if (attr_type_ != AttrType::UNDEFINED) {
+      Value value(attr_type_, const_cast<char *>(v), attr_length_);
+      return value.to_string();
+    } else {
+      static const char *dict = "0123456789abcdef";
+      stringstream ss;
+      for (int i = 0; i < attr_length_; i++) {
+        const unsigned char &c = static_cast<const unsigned char &>(v[i]);
+        ss << dict[c >> 4] << dict[c & 15];
+      }
+      return ss.str();
+    }
   }
 
 private:
