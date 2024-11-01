@@ -249,7 +249,37 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
         } else {
           right = std::move(cast_expr);
         }
-
+      } else if (implicit_cast_cost(left->value_type(), AttrType::FLOATS) != INT32_MAX && implicit_cast_cost(right->value_type(), AttrType::FLOATS) != INT32_MAX) {
+        {
+          ExprType left_type = left->type();
+          auto cast_expr = make_unique<CastExpr>(std::move(left), AttrType::FLOATS);
+          if (left_type == ExprType::VALUE) {
+            Value left_val;
+            if (OB_FAIL(rc = cast_expr->try_get_value(left_val)))
+            {
+              LOG_WARN("failed to get value from left child", strrc(rc));
+              return rc;
+            }
+            left = make_unique<ValueExpr>(left_val);
+          } else {
+            left = std::move(cast_expr);
+          }
+        }
+        {
+          ExprType right_type = right->type();
+          auto cast_expr = make_unique<CastExpr>(std::move(right), AttrType::FLOATS);
+          if (right_type == ExprType::VALUE) {
+            Value right_val;
+            if (OB_FAIL(rc = cast_expr->try_get_value(right_val)))
+            {
+              LOG_WARN("failed to get value from right child", strrc(rc));
+              return rc;
+            }
+            right = make_unique<ValueExpr>(right_val);
+          } else {
+            right = std::move(cast_expr);
+          }
+        }
       } else {
         rc = RC::UNSUPPORTED;
         LOG_WARN("unsupported cast from %s to %s", attr_type_to_string(left->value_type()), attr_type_to_string(right->value_type()));
