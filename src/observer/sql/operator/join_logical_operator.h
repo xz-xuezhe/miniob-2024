@@ -28,6 +28,9 @@ public:
   virtual ~JoinLogicalOperator() = default;
 
   LogicalOperatorType type() const override { return LogicalOperatorType::JOIN; }
+  void                set_predicate(std::unique_ptr<Expression> predicate) { predicate_ = std::move(predicate); }
+  std::unique_ptr<Expression> &predicate() { return predicate_; }
 
 private:
+  std::unique_ptr<Expression> predicate_;
 };

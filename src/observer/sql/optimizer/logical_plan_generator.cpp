@@ -98,29 +98,83 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 {
   unique_ptr<LogicalOperator> *last_oper = nullptr;
 
+  unique_ptr<LogicalOperator> predicate_oper;
+  RC rc = create_plan(select_stmt->filter_stmt(), predicate_oper);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
+    return rc;
+  }
+
   unique_ptr<LogicalOperator> table_oper(nullptr);
   last_oper = &table_oper;
 
   const std::vector<Table *> &tables = select_stmt->tables();
+  std::unordered_map<std::string, Table *> table_map;
   for (Table *table : tables) {
-
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
+    std::unique_ptr<Expression> join_predicate;
+    if (predicate_oper && !predicate_oper->expressions().empty() &&
+        predicate_oper->expressions()[0]->type() == ExprType::CONJUNCTION) {
+      ConjunctionExpr &conjunction_expr = static_cast<ConjunctionExpr &>(*predicate_oper->expressions()[0]);
+      if (conjunction_expr.conjunction_type() == ConjunctionExpr::Type::AND) {
+        std::vector<std::unique_ptr<Expression>> &expressions =
+            static_cast<ConjunctionExpr &>(*predicate_oper->expressions()[0]).children();
+        std::vector<std::unique_ptr<Expression>> predicates;
+        for (int i = expressions.size() - 1; ~i; i--) {
+          if (expressions[i]->type() != ExprType::COMPARISON)
+            continue;
+          ComparisonExpr &expression = static_cast<ComparisonExpr &>(*expressions[i]);
+          if (expression.left()->type() != ExprType::VALUE && expression.right()->type() != ExprType::VALUE)
+            continue;
+          if ((expression.left()->type() == ExprType::VALUE && expression.right()->type() == ExprType::VALUE) ||
+              (expression.left()->type() == ExprType::FIELD &&
+                  strcmp(static_cast<FieldExpr &>(*expression.left()).table_name(), table->name()) == 0) ||
+              (expression.right()->type() == ExprType::FIELD &&
+                  strcmp(static_cast<FieldExpr &>(*expression.right()).table_name(), table->name()) == 0)) {
+            predicates.emplace_back(std::move(expressions[i]));
+            expressions.erase(expressions.begin() + i);
+          }
+        }
+        if (!predicates.empty()) {
+          reverse(predicates.begin(), predicates.end());
+          static_cast<TableGetLogicalOperator &>(*table_get_oper).set_predicates(std::move(predicates));
+        }
+        for (int i = expressions.size() - 1; ~i; i--) {
+          if (expressions[i]->type() != ExprType::COMPARISON)
+            continue;
+          ComparisonExpr &expression = static_cast<ComparisonExpr &>(*expressions[i]);
+          if (expression.comp() != CompOp::EQUAL_TO)
+            continue;
+          if (expression.left()->type() != ExprType::FIELD || expression.right()->type() != ExprType::FIELD)
+            continue;
+          FieldExpr &left  = static_cast<FieldExpr &>(*expression.left());
+          FieldExpr &right = static_cast<FieldExpr &>(*expression.right());
+          if (left.value_type() != right.value_type())
+            continue;
+          if (strcmp(left.table_name(), table->name()) == 0 && table_map.count(right.table_name())) {
+            expression.left().swap(expression.right());
+            join_predicate = std::move(expressions[i]);
+            expressions.erase(expressions.begin() + i);
+            break;
+          } else if (strcmp(right.table_name(), table->name()) == 0 && table_map.count(left.table_name())) {
+            join_predicate = std::move(expressions[i]);
+            expressions.erase(expressions.begin() + i);
+            break;
+          }
+        }
+      }
+    }
     if (table_oper == nullptr) {
       table_oper = std::move(table_get_oper);
     } else {
       JoinLogicalOperator *join_oper = new JoinLogicalOperator;
       join_oper->add_child(std::move(table_oper));
       join_oper->add_child(std::move(table_get_oper));
+      if (join_predicate)
+        join_oper->set_predicate(std::move(join_predicate));
       table_oper = unique_ptr<LogicalOperator>(join_oper);
     }
-  }
-
-  unique_ptr<LogicalOperator> predicate_oper;
-
-  RC rc = create_plan(select_stmt->filter_stmt(), predicate_oper);
-  if (OB_FAIL(rc)) {
-    LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
-    return rc;
+    table_map.insert({table->name(), table});
   }
 
   if (predicate_oper) {

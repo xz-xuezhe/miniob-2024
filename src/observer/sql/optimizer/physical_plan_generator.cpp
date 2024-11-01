@@ -340,7 +340,12 @@ RC PhysicalPlanGenerator::create_plan(JoinLogicalOperator &join_oper, unique_ptr
     return RC::INTERNAL;
   }
 
-  unique_ptr<PhysicalOperator> join_physical_oper(new NestedLoopJoinPhysicalOperator);
+  unique_ptr<PhysicalOperator> join_physical_oper;
+  if (join_oper.predicate() && child_opers.size() >= 2 && child_opers[1]->type() == LogicalOperatorType::TABLE_GET) {
+    join_physical_oper.reset(new HashJoinPhysicalOperator(std::move(join_oper.predicate())));
+  } else {
+    join_physical_oper.reset(new NestedLoopJoinPhysicalOperator);
+  }
   for (auto &child_oper : child_opers) {
     unique_ptr<PhysicalOperator> child_physical_oper;
     rc = create(*child_oper, child_physical_oper);

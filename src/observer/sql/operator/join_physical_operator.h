@@ -51,3 +51,42 @@ private:
   bool              round_done_   = true;  //! 右表遍历的一轮是否结束
   bool              right_closed_ = true;  //! 右表算子是否已经关闭
 };
+
+/**
+ * @brief 基于哈希表的两表（称为左表、右表）join算子
+ * @details 依次遍历左表的每一行，然后关联右表的每一行
+ * @ingroup PhysicalOperator
+ */
+class HashJoinPhysicalOperator : public PhysicalOperator
+{
+public:
+  HashJoinPhysicalOperator(std::unique_ptr<Expression> predicate);
+  virtual ~HashJoinPhysicalOperator() = default;
+
+  PhysicalOperatorType type() const override { return PhysicalOperatorType::HASH_JOIN; }
+
+  RC     open(Trx *trx) override;
+  RC     next() override;
+  RC     close() override;
+  Tuple *current_tuple() override;
+
+private:
+  RC left_next();   //! 左表遍历下一条数据
+  RC right_next();  //! 右表遍历下一条数据，如果上一轮结束了就重新开始新的一轮
+
+private:
+  Trx *trx_ = nullptr;
+
+  //! 左表右表的真实对象是在PhysicalOperator::children_中，这里是为了写的时候更简单
+  PhysicalOperator *                                               left_       = nullptr;
+  PhysicalOperator *                                               right_      = nullptr;
+  Tuple *                                                          left_tuple_ = nullptr;
+  RowTuple                                                         right_tuple_;
+  JoinedTuple                                                      joined_tuple_;  //! 当前关联的左右两个tuple
+  std::unique_ptr<Expression>                                      predicate_ = nullptr;
+  Expression *                                                     predicate_left_;
+  Expression *                                                     predicate_right_;
+  std::unordered_map<std::string, std::vector<Record>>             record_map_;
+  std::unordered_map<std::string, std::vector<Record>>::iterator   map_iterator_;
+  std::vector<Record>::iterator                                    vector_iterator_;
+};

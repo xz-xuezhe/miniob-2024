@@ -69,7 +69,6 @@ struct ConditionSqlNode
   CompOp      comp;   ///< comparison operator
   std::unique_ptr<Expression> left;   ///< left-hand side expression
   std::unique_ptr<Expression> right;  ///< right-hand side expression
-  
 };
 
 /**
