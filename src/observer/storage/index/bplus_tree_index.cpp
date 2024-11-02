@@ -112,7 +112,20 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
       memset(data + offset + len, 0, field_meta.len() - len);
     offset += field_meta.len();
   }
-  RC rc = index_handler_.insert_entry(data, rid);
+  RC rc = RC::SUCCESS;
+  if (index_meta_.unique()) {
+    list<RID> rids;
+    rc = index_handler_.get_entry(data, offset, rids);
+    if (OB_FAIL(rc)) {
+      LOG_WARN("failed to get entry");
+      return rc;
+    }
+    if (!rids.empty()) {
+      delete[] data;
+      return RC::RECORD_DUPLICATE_KEY;
+    }
+  }
+  rc = index_handler_.insert_entry(data, rid);
   delete[] data;
   return rc;
 }

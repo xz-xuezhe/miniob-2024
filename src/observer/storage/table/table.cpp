@@ -399,7 +399,8 @@ RC Table::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode m
   return rc;
 }
 
-RC Table::create_index(Trx *trx, const std::vector<const FieldMeta *> &field_metas, const char *index_name)
+RC Table::create_index(
+    Trx *trx, const std::vector<const FieldMeta *> &field_metas, const char *index_name, bool unique /*= false*/)
 {
   if (common::is_blank(index_name) || field_metas.empty()) {
     LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name());
@@ -408,7 +409,7 @@ RC Table::create_index(Trx *trx, const std::vector<const FieldMeta *> &field_met
 
   IndexMeta new_index_meta;
 
-  RC rc = new_index_meta.init(index_name, field_metas);
+  RC rc = new_index_meta.init(index_name, field_metas, unique);
   if (rc != RC::SUCCESS) {
     LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s", name(), index_name);
     return rc;
