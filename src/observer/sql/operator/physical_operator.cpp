@@ -27,6 +27,7 @@ std::string physical_operator_type_name(PhysicalOperatorType type)
     case PhysicalOperatorType::DELETE: return "DELETE";
     case PhysicalOperatorType::PROJECT: return "PROJECT";
     case PhysicalOperatorType::STRING_LIST: return "STRING_LIST";
+    case PhysicalOperatorType::ORDER_BY: return "ORDER_BY";
     case PhysicalOperatorType::HASH_GROUP_BY: return "HASH_GROUP_BY";
     case PhysicalOperatorType::SCALAR_GROUP_BY: return "SCALAR_GROUP_BY";
     case PhysicalOperatorType::AGGREGATE_VEC: return "AGGREGATE_VEC";

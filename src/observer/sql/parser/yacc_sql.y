@@ -69,6 +69,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         CREATE
         DROP
         GROUP
+        ORDER
+        ASC
         TABLE
         TABLES
         INDEX
@@ -124,23 +126,25 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
-  ParsedSqlNode *                                  sql_node;
-  ConditionSqlNode *                               condition;
-  Value *                                          value;
-  enum CompOp                                      comp;
-  RelAttrSqlNode *                                 rel_attr;
-  std::vector<AttrInfoSqlNode> *                   attr_infos;
-  AttrInfoSqlNode *                                attr_info;
-  Expression *                                     expression;
-  std::vector<std::unique_ptr<Expression>> *       expression_list;
-  std::vector<Value> *                             value_list;
-  JoinSqlNode *                                    join_list;
-  std::vector<std::unique_ptr<ConditionSqlNode>> * condition_list;
-  std::vector<RelAttrSqlNode> *                    rel_attr_list;
-  std::vector<std::string> *                       relation_list;
-  char *                                           string;
-  int                                              number;
-  float                                            floats;
+  ParsedSqlNode *                                            sql_node;
+  ConditionSqlNode *                                         condition;
+  Value *                                                    value;
+  enum CompOp                                                comp;
+  RelAttrSqlNode *                                           rel_attr;
+  std::vector<AttrInfoSqlNode> *                             attr_infos;
+  AttrInfoSqlNode *                                          attr_info;
+  Expression *                                               expression;
+  std::vector<std::unique_ptr<Expression>> *                 expression_list;
+  std::vector<Value> *                                       value_list;
+  JoinSqlNode *                                              join_list;
+  std::vector<std::unique_ptr<ConditionSqlNode>> *           condition_list;
+  std::vector<RelAttrSqlNode> *                              rel_attr_list;
+  std::vector<std::string> *                                 relation_list;
+  std::pair<std::unique_ptr<Expression>, bool> *             order_by_item;
+  std::vector<std::pair<std::unique_ptr<Expression>, bool>> *order_by_list;
+  char *                                                     string;
+  int                                                        number;
+  float                                                      floats;
 }
 
 %token <number> NUMBER
@@ -169,6 +173,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <expression>          expression
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
+%type <order_by_item>       order_by_item
+%type <order_by_list>       order_by_list
+%type <order_by_list>       order_by
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
 %type <sql_node>            insert_stmt
@@ -478,7 +485,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list join_list where group_by
+    SELECT expression_list FROM rel_list join_list where group_by order_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -505,6 +512,11 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.relations.insert($$->selection.relations.end(), std::make_move_iterator($5->relations.begin()), std::make_move_iterator($5->relations.end()));
         $$->selection.conditions.insert($$->selection.conditions.end(), std::make_move_iterator($5->conditions.begin()), std::make_move_iterator($5->conditions.end()));
         delete $5;
+      }
+
+      if ($8 != nullptr) {
+        $$->selection.order_by.swap(*$8);
+        delete $8;
       }
     }
     ;
@@ -693,6 +705,46 @@ group_by:
       $$ = $3;
     }
     ;
+
+order_by_item:
+    expression
+    {
+      $$ = new std::pair<std::unique_ptr<Expression>, bool>($1, true);
+    }
+    | expression ASC
+    {
+      $$ = new std::pair<std::unique_ptr<Expression>, bool>($1, true);
+    }
+    | expression DESC
+    {
+      $$ = new std::pair<std::unique_ptr<Expression>, bool>($1, false);
+    }
+    ;
+order_by_list:
+    order_by_item
+    {
+      $$ = new std::vector<std::pair<std::unique_ptr<Expression>, bool>>;
+      $$->emplace_back(std::move(*$1));
+      delete $1;
+    }
+    | order_by_item COMMA order_by_list
+    {
+      $$ = $3;
+      $$->insert($$->begin(), std::move(*$1));
+      delete $1;
+    }
+    ;
+order_by:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | ORDER BY order_by_list
+    {
+      $$ = $3;
+    }
+    ;
+
 load_data_stmt:
     LOAD DATA INFILE SSS INTO TABLE ID 
     {

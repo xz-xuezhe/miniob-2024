@@ -41,8 +41,8 @@ RC IndexMeta::init(const char *name, const std::vector<const FieldMeta *> &field
 void IndexMeta::to_json(Json::Value &json_value) const
 {
   json_value[FIELD_NAME]       = name_;
-  for(int i = 0; i < fields_.size(); i++)
-    json_value[FIELD_FIELD_NAME][i] = fields_[i];
+  for(size_t i = 0; i != fields_.size(); i++)
+    json_value[FIELD_FIELD_NAME][static_cast<int>(i)] = fields_[i];
 }
 
 RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, IndexMeta &index)
@@ -61,7 +61,7 @@ RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, I
   }
 
   std::vector<const FieldMeta *> fields;
-  for(int i = 0; i < fields_value.size(); i++) {
+  for(Json::ArrayIndex i = 0; i != fields_value.size(); i++) {
     if (!fields_value[i].isString()){
       LOG_ERROR("Field name of index [%s] is not a string. json value=%s",
           name_value.asCString(), fields_value[i].toStyledString().c_str());
@@ -83,7 +83,7 @@ const vector<string> &IndexMeta::fields() const { return fields_; }
 
 void IndexMeta::desc(ostream &os) const {
   os << "index name=" << name_ << ", fields=[";
-  for(int i = 0; i < fields_.size(); i++) {
+  for(size_t i = 0; i != fields_.size(); i++) {
     if (i)
       os << ", ";
     os << fields_[i];
