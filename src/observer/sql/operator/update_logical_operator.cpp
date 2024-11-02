@@ -10,5 +10,10 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/update_logical_operator.h"
 
-UpdateLogicalOperator::UpdateLogicalOperator(Table *table, const FieldMeta *field_meta, const Value &value): table_(table), field_meta_(field_meta), value_(value)
-{}
+UpdateLogicalOperator::UpdateLogicalOperator(
+    Table *table, const vector<pair<const FieldMeta *, const Value *>> &assignments)
+    : table_(table)
+{
+  for (const auto &assignment : assignments)
+    assignments_.emplace_back(assignment.first, *assignment.second);
+}

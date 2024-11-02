@@ -24,7 +24,7 @@ class UpdateStmt;
 class UpdatePhysicalOperator : public PhysicalOperator
 {
 public:
-  UpdatePhysicalOperator(Table *table, const FieldMeta *field, Value &&value);
+  UpdatePhysicalOperator(Table *table, vector<pair<const FieldMeta *, Value>> &&assignments);
 
   virtual ~UpdatePhysicalOperator() = default;
 
@@ -37,9 +37,8 @@ public:
   Tuple *current_tuple() override { return nullptr; }
 
 private:
-  Table *             table_      = nullptr;
-  const FieldMeta *   field_meta_ = nullptr;
-  Value               value_;
-  Trx *               trx_ = nullptr;
-  std::vector<Record> records_;
+  Table *                                table_ = nullptr;
+  vector<pair<const FieldMeta *, Value>> assignments_;
+  Trx *                                  trx_ = nullptr;
+  std::vector<Record>                    records_;
 };

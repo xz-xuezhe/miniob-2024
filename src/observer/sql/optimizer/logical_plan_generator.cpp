@@ -364,8 +364,7 @@ RC LogicalPlanGenerator::create_plan(DeleteStmt *delete_stmt, unique_ptr<Logical
 RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
   Table *table = update_stmt->table();
-  const FieldMeta *field = update_stmt->field_meta();
-  Value value = *(update_stmt->value());
+  const vector<pair<const FieldMeta *, const Value *>> &assignments = update_stmt->assignments();
   FilterStmt *filter_stmt = update_stmt->filter_stmt();
   unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_WRITE));
 
@@ -374,7 +373,7 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
   if (rc != RC::SUCCESS)
     return rc;
 
-  unique_ptr<LogicalOperator> update_oper(new UpdateLogicalOperator(table, field, value));
+  unique_ptr<LogicalOperator> update_oper(new UpdateLogicalOperator(table, assignments));
 
   if (predicate_oper) {
     predicate_oper->add_child(std::move(table_get_oper));

@@ -16,8 +16,8 @@ See the Mulan PSL v2 for more details. */
 
 using namespace std;
 
-UpdatePhysicalOperator::UpdatePhysicalOperator(Table *table, const FieldMeta *field_meta, Value &&value)
-    : table_(table), field_meta_(field_meta), value_(value)
+UpdatePhysicalOperator::UpdatePhysicalOperator(Table *table, vector<pair<const FieldMeta *, Value>> &&assignments)
+    : table_(table), assignments_(assignments)
 {}
 
 RC UpdatePhysicalOperator::open(Trx *trx)
@@ -52,10 +52,12 @@ RC UpdatePhysicalOperator::open(Trx *trx)
 
   // 先收集记录再更新
   for (Record &record : records_) {
-    rc = trx_->update_record(table_, record, field_meta_, value_);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to update record: %s", strrc(rc));
-      return rc;
+    for(auto &[field_meta_, value_] : assignments_) {
+      rc = trx_->update_record(table_, record, field_meta_, value_);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to update record: %s", strrc(rc));
+        return rc;
+      }
     }
   }
 

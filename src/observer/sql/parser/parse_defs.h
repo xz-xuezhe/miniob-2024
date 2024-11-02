@@ -71,6 +71,12 @@ struct ConditionSqlNode
   std::unique_ptr<Expression> right;  ///< right-hand side expression
 };
 
+struct Assignment
+{
+  std::string attribute_name;  ///< 更新的字段，仅支持一个字段
+  Value       value;           ///< 更新的值，仅支持一个字段
+};
+
 /**
  * @brief 描述一个select语句
  * @ingroup SQLParser
@@ -127,10 +133,9 @@ struct DeleteSqlNode
  */
 struct UpdateSqlNode
 {
-  std::string                                    relation_name;   ///< Relation to update
-  std::string                                    attribute_name;  ///< 更新的字段，仅支持一个字段
-  Value                                          value;           ///< 更新的值，仅支持一个字段
-  std::vector<std::unique_ptr<ConditionSqlNode>> conditions;
+  std::string                                     relation_name;  ///< Relation to update
+  std::vector<std::unique_ptr<Assignment>> assignments;    ///< 更新操作
+  std::vector<std::unique_ptr<ConditionSqlNode>>  conditions;
 };
 
 /**

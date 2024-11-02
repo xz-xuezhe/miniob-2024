@@ -134,6 +134,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   RelAttrSqlNode *                                           rel_attr;
   std::vector<AttrInfoSqlNode> *                             attr_infos;
   AttrInfoSqlNode *                                          attr_info;
+  Assignment *                                               assignment;
+  std::vector<std::unique_ptr<Assignment>> *                 assignment_list;
   Expression *                                               expression;
   std::vector<std::unique_ptr<Expression>> *                 expression_list;
   std::vector<Value> *                                       value_list;
@@ -171,6 +173,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <condition_list>      condition_list
 %type <string>              storage_format
 %type <relation_list>       rel_list
+%type <assignment>          assignment
+%type <assignment_list>     assignment_list
 %type <expression>          expression
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
@@ -484,18 +488,17 @@ delete_stmt:    /*  delete 语句的语法解析树*/
     }
     ;
 update_stmt:      /*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ value where 
+    UPDATE ID SET assignment_list where 
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
       $$->update.relation_name = $2;
-      $$->update.attribute_name = $4;
-      $$->update.value = *$6;
-      if ($7 != nullptr) {
-        $$->update.conditions.swap(*$7);
-        delete $7;
+      $$->update.assignments.swap(*$4);
+      if ($5 != nullptr) {
+        $$->update.conditions.swap(*$5);
+        delete $5;
       }
       free($2);
-      free($4);
+      delete $4;
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
@@ -540,6 +543,29 @@ calc_stmt:
       $$ = new ParsedSqlNode(SCF_CALC);
       $$->calc.expressions.swap(*$2);
       delete $2;
+    }
+    ;
+
+assignment_list:
+    assignment
+    {
+      $$ = new std::vector<std::unique_ptr<Assignment>>;
+      $$->emplace_back($1);
+    }
+    | assignment COMMA assignment_list
+    {
+      $$ = $3;
+      $$->emplace_back($1);
+    }
+    ;
+assignment:
+    ID EQ value
+    {
+      $$ = new Assignment;
+      $$->attribute_name = $1;
+      $$->value = *$3;
+      free($1);
+      delete $3;
     }
     ;
 

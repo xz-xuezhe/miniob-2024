@@ -137,6 +137,8 @@ union YYSTYPE
   RelAttrSqlNode *                                           rel_attr;
   std::vector<AttrInfoSqlNode> *                             attr_infos;
   AttrInfoSqlNode *                                          attr_info;
+  Assignment *                                               assignment;
+  std::vector<std::unique_ptr<Assignment>> *                 assignment_list;
   Expression *                                               expression;
   std::vector<std::unique_ptr<Expression>> *                 expression_list;
   std::vector<Value> *                                       value_list;
@@ -150,7 +152,7 @@ union YYSTYPE
   int                                                        number;
   float                                                      floats;
 
-#line 154 "yacc_sql.hpp"
+#line 156 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

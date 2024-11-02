@@ -19,16 +19,15 @@ See the Mulan PSL v2 for more details. */
 #include "storage/field/field_meta.h"
 #include "storage/table/table.h"
 
-UpdateStmt::UpdateStmt(Table *table, const FieldMeta *field_meta, const Value *value, FilterStmt *filter_stmt)
-    : table_(table), field_meta_(field_meta), value_(value), filter_stmt_(filter_stmt)
+UpdateStmt::UpdateStmt(Table *table, const std::vector<std::pair<const FieldMeta *, const Value *>> &assignments, FilterStmt *filter_stmt)
+    : table_(table), assignments_(assignments), filter_stmt_(filter_stmt)
 {}
 
 RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
 {
   const char *table_name = update.relation_name.c_str();
-  const char *field_name = update.attribute_name.c_str();
-  if (nullptr == db || nullptr == table_name || nullptr == field_name) {
-    LOG_WARN("invalid argument. db=%p, table_name=%p, field_name:%p", db, table_name, field_name);
+  if (nullptr == db || nullptr == table_name || update.assignments.empty()) {
+    LOG_WARN("invalid argument. db=%p, table_name=%p", db, table_name);
     return RC::INVALID_ARGUMENT;
   }
 
@@ -39,12 +38,17 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  // check whether the field exists
-  const TableMeta &table_meta = table->table_meta();
-  const FieldMeta *field_meta = table_meta.field(field_name);
-  if (nullptr == field_meta) {
-    LOG_WARN("no such field. db=%s, table_name=%s, field_name=%s", db->name(), table_name, field_name);
-    return RC::SCHEMA_FIELD_NOT_EXIST;
+  // check whether the fields exists
+  std::vector<std::pair<const FieldMeta *, const Value *>> assignments;
+  for (std::unique_ptr<Assignment> &assignment : update.assignments) {
+    const TableMeta &table_meta = table->table_meta();
+    const char *field_name = assignment->attribute_name.c_str();
+    const FieldMeta *field_meta = table_meta.field(field_name);
+    if (nullptr == field_meta) {
+      LOG_WARN("no such field. db=%s, table_name=%s, field_name=%s", db->name(), table_name, field_name);
+      return RC::SCHEMA_FIELD_NOT_EXIST;
+    }
+    assignments.emplace_back(field_meta, &assignment->value);
   }
 
   std::unordered_map<std::string, Table *> table_map;
@@ -58,8 +62,6 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update, Stmt *&stmt)
     return rc;
   }
 
-  const Value *value = &update.value;
-
-  stmt = new UpdateStmt(table, field_meta, value, filter_stmt);
+  stmt = new UpdateStmt(table, assignments, filter_stmt);
   return rc;
 }
