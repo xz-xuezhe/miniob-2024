@@ -162,7 +162,6 @@ RC HashJoinPhysicalOperator::open(Trx *trx)
     LOG_WARN("failed to open right oper. rc=%s", strrc(rc));
     return rc;
   }
-  RowTuple *last_tuple = nullptr;
   for (;;) {
     rc = right_->next();
     if (OB_FAIL(rc)) {
@@ -175,14 +174,17 @@ RC HashJoinPhysicalOperator::open(Trx *trx)
     if (OB_FAIL(rc))
       return rc;
     const string &str = value.to_string();
-    auto          it  = record_map_.find(str);
-    if (it == record_map_.end())
-      it = record_map_.insert({str, std::vector<Record>()}).first;
-    last_tuple = static_cast<RowTuple *>(right_->current_tuple());
-    it->second.push_back(last_tuple->record());
+    auto          it  = tuple_map_.find(str);
+    if (it == tuple_map_.end())
+      it = tuple_map_.insert({str, std::vector<ValueListTuple>()}).first;
+    ValueListTuple temp;
+    rc = ValueListTuple::make(*right_->current_tuple(), temp);
+    if (OB_FAIL(rc)) {
+      LOG_WARN("failed to make value list tuple");
+      return rc;
+    }
+    it->second.push_back(temp);
   }
-  if (last_tuple)
-    right_tuple_.set_schema_from_other(*last_tuple);
   rc = right_->close();
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to close right oper. rc=%s", strrc(rc));
@@ -190,14 +192,14 @@ RC HashJoinPhysicalOperator::open(Trx *trx)
   }
   rc            = left_->open(trx);
   trx_          = trx;
-  map_iterator_ = record_map_.end();
+  map_iterator_ = tuple_map_.end();
   return rc;
 }
 
 RC HashJoinPhysicalOperator::next()
 {
   RC rc = RC::SUCCESS;
-  while (map_iterator_ == record_map_.end() || vector_iterator_ == map_iterator_->second.end()) {
+  while (map_iterator_ == tuple_map_.end() || vector_iterator_ == map_iterator_->second.end()) {
     rc = left_next();
     if (OB_FAIL(rc))
       return rc;
@@ -225,8 +227,8 @@ RC HashJoinPhysicalOperator::left_next()
   Value value;
   predicate_left_->get_value(*left_->current_tuple(), value);
   const string &str = value.to_string();
-  map_iterator_     = record_map_.find(str);
-  if (map_iterator_ != record_map_.end())
+  map_iterator_     = tuple_map_.find(str);
+  if (map_iterator_ != tuple_map_.end())
     vector_iterator_ = map_iterator_->second.begin();
   left_tuple_ = left_->current_tuple();
   joined_tuple_.set_left(left_tuple_);
@@ -235,9 +237,9 @@ RC HashJoinPhysicalOperator::left_next()
 
 RC HashJoinPhysicalOperator::right_next()
 {
-  if (map_iterator_ == record_map_.end() || vector_iterator_ == map_iterator_->second.end())
+  if (map_iterator_ == tuple_map_.end() || vector_iterator_ == map_iterator_->second.end())
     return RC::RECORD_EOF;
-  right_tuple_.set_record(&*vector_iterator_++);
-  joined_tuple_.set_right(&right_tuple_);
+  right_tuple_ = (&*vector_iterator_++);
+  joined_tuple_.set_right(right_tuple_);
   return RC::SUCCESS;
 }

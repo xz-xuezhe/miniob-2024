@@ -188,17 +188,6 @@ public:
     }
   }
 
-  void set_schema_from_other(const RowTuple &other)
-  {
-    table_ = other.table_;
-    for (FieldExpr *spec : speces_)
-      delete spec;
-    this->speces_.clear();
-    this->speces_.reserve(other.speces_.size());
-    for (FieldExpr *spec : other.speces_)
-      speces_.push_back(new FieldExpr(table_, spec->field().meta()));
-  }
-
   int cell_num() const override { return speces_.size(); }
 
   RC cell_at(int index, Value &cell) const override

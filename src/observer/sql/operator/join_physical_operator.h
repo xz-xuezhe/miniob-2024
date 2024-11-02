@@ -78,15 +78,15 @@ private:
   Trx *trx_ = nullptr;
 
   //! 左表右表的真实对象是在PhysicalOperator::children_中，这里是为了写的时候更简单
-  PhysicalOperator *                                               left_       = nullptr;
-  PhysicalOperator *                                               right_      = nullptr;
-  Tuple *                                                          left_tuple_ = nullptr;
-  RowTuple                                                         right_tuple_;
-  JoinedTuple                                                      joined_tuple_;  //! 当前关联的左右两个tuple
-  std::unique_ptr<Expression>                                      predicate_ = nullptr;
-  Expression *                                                     predicate_left_;
-  Expression *                                                     predicate_right_;
-  std::unordered_map<std::string, std::vector<Record>>             record_map_;
-  std::unordered_map<std::string, std::vector<Record>>::iterator   map_iterator_;
-  std::vector<Record>::iterator                                    vector_iterator_;
+  PhysicalOperator *                                           left_        = nullptr;
+  PhysicalOperator *                                           right_       = nullptr;
+  Tuple *                                                      left_tuple_  = nullptr;
+  Tuple *                                                      right_tuple_ = nullptr;
+  JoinedTuple                                                  joined_tuple_;  //! 当前关联的左右两个tuple
+  std::unique_ptr<Expression>                                  predicate_ = nullptr;
+  Expression *                                                 predicate_left_;
+  Expression *                                                 predicate_right_;
+  std::unordered_map<string, vector<ValueListTuple>>           tuple_map_;
+  std::unordered_map<string, vector<ValueListTuple>>::iterator map_iterator_;
+  vector<ValueListTuple>::iterator                             vector_iterator_;
 };
