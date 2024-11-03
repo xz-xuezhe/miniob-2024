@@ -407,9 +407,18 @@ RC Table::create_index(
     return RC::INVALID_ARGUMENT;
   }
 
+  RC rc = RC::SUCCESS;
   IndexMeta new_index_meta;
+  if (table_meta_.sys_field_num() > 0) {
+    std::vector<const FieldMeta *> real_field_metas = field_metas;
+    span<const FieldMeta> trx_fields = table_meta_.trx_fields();
+    for (const FieldMeta &trx_field : trx_fields)
+      real_field_metas.push_back(&trx_field);
+    rc = new_index_meta.init(index_name, real_field_metas, unique);
+  } else {
+    rc = new_index_meta.init(index_name, field_metas, unique);
+  }
 
-  RC rc = new_index_meta.init(index_name, field_metas, unique);
   if (rc != RC::SUCCESS) {
     LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s", name(), index_name);
     return rc;

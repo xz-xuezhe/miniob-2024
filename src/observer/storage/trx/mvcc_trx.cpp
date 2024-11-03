@@ -188,7 +188,19 @@ RC MvccTrx::delete_record(Table *table, Record &record)
 
 RC MvccTrx::update_record(Table *table, Record &record, const FieldMeta *field_meta, const Value &value)
 {
-  return RC::UNIMPLEMENTED;
+  RC rc = RC::SUCCESS;
+  rc = delete_record(table, record);
+  if (OB_FAIL(rc))
+    return rc;
+  Record *new_record = new Record;
+  char *data = (char *)malloc(record.len());
+  memcpy(data, record.data(), record.len());
+  new_record->set_data_owner(data, record.len());
+  new_record->set_field(field_meta->offset(), field_meta->len(), (char *)value.data());
+  rc = insert_record(table, *new_record);
+  if (OB_FAIL(rc))
+    return rc;
+  return rc;
 }
 
 RC MvccTrx::visit_record(Table *table, Record &record, ReadWriteMode mode)

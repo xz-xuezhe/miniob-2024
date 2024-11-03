@@ -51,7 +51,6 @@ public:
   enum class Type : int
   {
     INSERT,
-    UPDATE,
     DELETE,
     UNDEFINED,
   };

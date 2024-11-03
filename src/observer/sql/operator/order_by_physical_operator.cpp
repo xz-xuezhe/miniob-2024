@@ -52,7 +52,7 @@ RC OrderByPhysicalOperator::open(Trx *trx)
       }
       values.emplace_back(value, item.second);
     }
-    tuples_.emplace_back(move(values), tuple);
+    tuples_.emplace_back(std::move(values), tuple);
   }
   rc = child->close();
   if (OB_FAIL(rc)) {
