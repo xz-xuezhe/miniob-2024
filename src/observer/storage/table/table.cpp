@@ -407,17 +407,17 @@ RC Table::create_index(
     return RC::INVALID_ARGUMENT;
   }
 
+  const std::vector<const FieldMeta *> *field_metas_ptr = &field_metas;
   RC rc = RC::SUCCESS;
   IndexMeta new_index_meta;
   if (table_meta_.sys_field_num() > 0) {
-    std::vector<const FieldMeta *> real_field_metas = field_metas;
+    std::vector<const FieldMeta *> *real_field_metas = new std::vector<const FieldMeta *>(field_metas);
     span<const FieldMeta> trx_fields = table_meta_.trx_fields();
     for (const FieldMeta &trx_field : trx_fields)
-      real_field_metas.push_back(&trx_field);
-    rc = new_index_meta.init(index_name, real_field_metas, unique);
-  } else {
-    rc = new_index_meta.init(index_name, field_metas, unique);
+      real_field_metas->push_back(&trx_field);
+    field_metas_ptr = real_field_metas;
   }
+  rc = new_index_meta.init(index_name, *field_metas_ptr, unique);
 
   if (rc != RC::SUCCESS) {
     LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s", name(), index_name);
@@ -428,11 +428,16 @@ RC Table::create_index(
   BplusTreeIndex *index      = new BplusTreeIndex();
   string          index_file = table_index_file(base_dir_.c_str(), name(), index_name);
 
-  rc = index->create(this, index_file.c_str(), new_index_meta, field_metas);
+  rc = index->create(this, index_file.c_str(), new_index_meta, *field_metas_ptr);
   if (rc != RC::SUCCESS) {
     delete index;
     LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
     return rc;
+  }
+
+  if (field_metas_ptr != &field_metas) {
+    delete field_metas_ptr;
+    field_metas_ptr = nullptr;
   }
 
   // 遍历当前的所有数据，插入这个索引

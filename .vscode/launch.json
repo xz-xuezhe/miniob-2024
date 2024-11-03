@@ -28,7 +28,7 @@
             "request": "launch",
             "name": "Debug (MVCC)",
             "program": "${workspaceFolder}/${defaultBuildTask}/bin/observer",
-            "args": ["-f", "${workspaceFolder}/etc/observer.ini", "-P", "cli", "-t", "mvcc"],
+            "args": ["-f", "${workspaceFolder}/etc/observer.ini", "-s", "miniob.sock", "-t", "mvcc"],
             "cwd": "${workspaceFolder}/${defaultBuildTask}/",
             "internalConsoleOptions": "openOnSessionStart",
             "osx": {
