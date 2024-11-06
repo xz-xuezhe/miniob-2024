@@ -108,6 +108,10 @@ Value &Value::operator=(const Value &other)
       set_string_from_other(other);
     } break;
 
+    case AttrType::VECTORS: {
+      set_vector_from_other(other);
+    } break;
+
     default: {
       this->value_ = other.value_;
     } break;
