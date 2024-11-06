@@ -90,7 +90,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       LOG_INFO("bind expression failed. rc=%s", strrc(rc));
       return rc;
     }
-    order_by.emplace_back(move(order_by_expressions[0]), item.second);
+    order_by.emplace_back(std::move(order_by_expressions[0]), item.second);
     order_by_expressions.clear();
   }
 

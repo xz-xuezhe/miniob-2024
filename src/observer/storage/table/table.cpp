@@ -575,7 +575,7 @@ RC Table::update_record(Record &record, const FieldMeta *field, const Value &val
     }
     memset(record.data() + field->offset(), 0, field->len());
     record.data()[null_field->offset() + (field->field_id() >> 3)] |= 1 << (field->field_id() & 7);
-  }if (field->type() != value.attr_type()) {
+  } else if (field->type() != value.attr_type()) {
     Value real_value;
     rc = Value::cast_to(value, field->type(), real_value);
     if (OB_FAIL(rc)) {
