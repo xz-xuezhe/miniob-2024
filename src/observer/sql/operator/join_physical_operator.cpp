@@ -173,6 +173,8 @@ RC HashJoinPhysicalOperator::open(Trx *trx)
     rc = predicate_right_->get_value(*right_->current_tuple(), value);
     if (OB_FAIL(rc))
       return rc;
+    if (value.is_null())
+      continue;
     const string &str = value.to_string();
     auto          it  = tuple_map_.find(str);
     if (it == tuple_map_.end())
@@ -225,7 +227,13 @@ RC HashJoinPhysicalOperator::left_next()
   if (OB_FAIL(rc))
     return rc;
   Value value;
-  predicate_left_->get_value(*left_->current_tuple(), value);
+  rc = predicate_left_->get_value(*left_->current_tuple(), value);
+  if (OB_FAIL(rc))
+    return rc;
+  if (value.is_null()) {
+    map_iterator_ = tuple_map_.end();
+    return rc;
+  }
   const string &str = value.to_string();
   map_iterator_     = tuple_map_.find(str);
   if (map_iterator_ != tuple_map_.end())

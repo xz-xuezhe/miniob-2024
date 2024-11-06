@@ -70,9 +70,9 @@ RC OrderByPhysicalOperator::open(Trx *trx)
           if (bl && br)
             continue;
           if (bl)
-            return true;
+            return true == l.first[i].second;
           if (br)
-            return false;
+            return false == l.first[i].second;
           int result = l.first[i].first.compare(r.first[i].first);
           if (result == 0)
             continue;
