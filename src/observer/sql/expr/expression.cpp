@@ -369,6 +369,11 @@ AttrType ArithmeticExpr::value_type() const
 
 RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value, Value &value) const
 {
+  if (left_value.is_null() || right_value.is_null()) {
+    value.set_null();
+    return RC::SUCCESS;
+  }
+
   RC rc = RC::SUCCESS;
 
   const AttrType target_type = value_type();

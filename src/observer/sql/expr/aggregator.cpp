@@ -71,17 +71,13 @@ RC AvgAggregator::accumulate(const Value &value)
   if (value.is_null())
     return RC::SUCCESS;
   ++count_;
-  Value::add(Value((value.get_float() - value_.get_float()) / count_), value_, value_);
+  Value::add(value, value_, value_);
   return RC::SUCCESS;
 }
 
 RC AvgAggregator::evaluate(Value& result)
 {
-  if (count_ == 0)
-    result.set_null();
-  else
-    result = value_;
-  return RC::SUCCESS;
+  return Value::divide(value_, Value(count_), result);
 }
 
 RC MaxAggregator::accumulate(const Value &value)
