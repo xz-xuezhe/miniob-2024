@@ -234,7 +234,9 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     unique_ptr<Expression> left(std::move(filter_unit->left()));
     unique_ptr<Expression> right(std::move(filter_unit->right()));
 
-    if (left->value_type() != right->value_type()) {
+    if (right->value_type() == AttrType::NULLS && (filter_unit->comp() == IS_NULL || filter_unit->comp() == NOT_NULL)) {
+      // nothing to do
+    } else if (left->value_type() != right->value_type()) {
       auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
       auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());
       if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {

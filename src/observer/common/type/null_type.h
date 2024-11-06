@@ -10,29 +10,22 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "common/rc.h"
 #include "common/type/data_type.h"
 
 /**
- * @brief 向量类型
+ * @brief 空类型
  * @ingroup DataType
  */
-class VectorType : public DataType
+class NullType : public DataType
 {
 public:
-  VectorType() : DataType(AttrType::VECTORS) {}
-  virtual ~VectorType() {}
-
-  int compare(const Value &left, const Value &right) const override;
-  RC cast_to(const Value &val, AttrType type, Value &result) const override;
-  int cast_cost(AttrType type) override;
-
+  NullType() : DataType(AttrType::NULLS) {}
+  virtual ~NullType() = default;
   RC add(const Value &left, const Value &right, Value &result) const override;
   RC subtract(const Value &left, const Value &right, Value &result) const override;
   RC multiply(const Value &left, const Value &right, Value &result) const override;
-
-  RC l2_distance(const Value &left, const Value &right, Value &result) const override;
-  RC cosine_distance(const Value &left, const Value &right, Value &result) const override;
-  RC inner_product(const Value &left, const Value &right, Value &result) const override;
-
+  RC divide(const Value &left, const Value &right, Value &result) const override;
+  RC negative(const Value &val, Value &result) const override;
   RC to_string(const Value &val, string &result) const override;
 };

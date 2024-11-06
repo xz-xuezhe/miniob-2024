@@ -31,8 +31,10 @@ int IntegerType::compare(const Value &left, const Value &right) const
 RC IntegerType::cast_to(const Value &val, AttrType type, Value &result) const
 {
   switch (type) {
-    case AttrType::FLOATS:
-    {
+    case AttrType::NULLS: {
+      result.set_null();
+    } break;
+    case AttrType::FLOATS: {
       result.attr_type_ = type;
       result.set_float(val.get_int());
     } break;
@@ -44,6 +46,9 @@ RC IntegerType::cast_to(const Value &val, AttrType type, Value &result) const
 int IntegerType::cast_cost(AttrType type) {
   if (type == AttrType::INTS) {
     return 0;
+  }
+  if (type == AttrType::NULLS) {
+    return 1;
   }
   if (type == AttrType::FLOATS) {
     return 1;

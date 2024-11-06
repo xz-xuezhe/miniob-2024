@@ -199,8 +199,13 @@ public:
 
     FieldExpr       *field_expr = speces_[index];
     const FieldMeta *field_meta = field_expr->field().meta();
-    cell.set_type(field_meta->type());
-    cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+    const FieldMeta *null_field = table_->table_meta().null_field();
+    if ((this->record_->data()[null_field->offset() + field_meta->field_id() / 8] >> (field_meta->field_id() & 7)) & 1) {
+      cell.set_null();
+    } else {
+      cell.set_type(field_meta->type());
+      cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
+    }
     return RC::SUCCESS;
   }
 

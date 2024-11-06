@@ -30,6 +30,7 @@ class Value final
 {
 public:
   friend class DataType;
+  friend class NullType;
   friend class IntegerType;
   friend class FloatType;
   friend class BooleanType;
@@ -59,26 +60,46 @@ public:
 
   static RC add(const Value &left, const Value &right, Value &result)
   {
+    if (left.is_null() || right.is_null()) {
+      result.set_null();
+      return RC::SUCCESS;
+    }
     return DataType::type_instance(result.attr_type())->add(left, right, result);
   }
 
   static RC subtract(const Value &left, const Value &right, Value &result)
   {
+    if (left.is_null() || right.is_null()) {
+      result.set_null();
+      return RC::SUCCESS;
+    }
     return DataType::type_instance(result.attr_type())->subtract(left, right, result);
   }
 
   static RC multiply(const Value &left, const Value &right, Value &result)
   {
+    if (left.is_null() || right.is_null()) {
+      result.set_null();
+      return RC::SUCCESS;
+    }
     return DataType::type_instance(result.attr_type())->multiply(left, right, result);
   }
 
   static RC divide(const Value &left, const Value &right, Value &result)
   {
+    if (left.is_null() || right.is_null()) {
+      result.set_null();
+      return RC::SUCCESS;
+    }
     return DataType::type_instance(result.attr_type())->divide(left, right, result);
   }
 
   static RC negative(const Value &value, Value &result)
   {
+    if (value.is_null()) {
+      result.set_null();
+      return RC::SUCCESS;
+    }
     return DataType::type_instance(result.attr_type())->negative(value, result);
   }
 
@@ -92,6 +113,7 @@ public:
   void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
   void set_value(const Value &value);
   void set_boolean(bool val);
+  void set_null();
 
   string to_string() const;
 
@@ -107,6 +129,7 @@ public:
    * 获取对应的值
    * 如果当前的类型与期望获取的类型不符，就会执行转换操作
    */
+  bool   is_null() const;
   int    get_int() const;
   float  get_float() const;
   string get_string() const;

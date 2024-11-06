@@ -121,6 +121,14 @@ ComparisonExpr::~ComparisonExpr() {}
 
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
+  if (comp_ == IS_NULL) {
+    result = left.is_null();
+    return RC::SUCCESS;
+  }
+  if (comp_ == NOT_NULL) {
+    result = !left.is_null();
+    return RC::SUCCESS;
+  }
   if (comp_ == LIKE || comp_ == NOT_LIKE) {
     if (left.attr_type() != AttrType::CHARS || right.attr_type() != AttrType::CHARS) {
       LOG_WARN("unsupported comparison. %d", comp_);
@@ -154,8 +162,7 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
       result = !f.back();
     return RC::SUCCESS;
   }
-  if ((left.attr_type() == AttrType::FLOATS && left.get_float() == numeric_limits<float>::max()) ||
-      (right.attr_type() == AttrType::FLOATS && right.get_float() == numeric_limits<float>::max())) {
+  if (left.is_null() || right.is_null()) {
     result = false;
     return RC::SUCCESS;
   }
@@ -345,6 +352,9 @@ AttrType ArithmeticExpr::value_type() const
   if (!right_) {
     return left_->value_type();
   }
+
+  if (left_->value_type() == AttrType::NULLS || right_->value_type() == AttrType::NULLS)
+    return AttrType::NULLS;
 
   if (left_->value_type() == AttrType::VECTORS || right_->value_type() == AttrType::VECTORS)
     return AttrType::VECTORS;

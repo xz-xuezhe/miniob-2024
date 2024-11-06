@@ -96,6 +96,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         FLOAT_T
         DATE_T
         VECTOR_T
+        NIL
         HELP
         EXIT
         DOT //QUOTE
@@ -104,6 +105,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         FROM
         INNER_JOIN
         WHERE
+        NOT
         AND
         SET
         ON
@@ -119,8 +121,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         LE
         GE
         NE
+        IS
         LK
-        NL
         L2_DISTANCE
         COSINE_DISTANCE
         INNER_PRODUCT
@@ -148,6 +150,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   char *                                                     string;
   int                                                        number;
   float                                                      floats;
+  bool                                                       booleans;
 }
 
 %token <number> NUMBER
@@ -181,6 +184,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <order_by_item>       order_by_item
 %type <order_by_list>       order_by_list
 %type <order_by_list>       order_by
+%type <booleans>            nullable
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
 %type <sql_node>            insert_stmt
@@ -374,31 +378,50 @@ attr_def_list:
     ;
     
 attr_def:
-    ID STRING_T LBRACE number RBRACE 
+    ID STRING_T LBRACE number RBRACE nullable
     {
       $$ = new AttrInfoSqlNode;
       $$->type = AttrType::CHARS;
       $$->name = $1;
       $$->length = $4;
+      $$->nullable = $6;
       free($1);
     }
-    | ID VECTOR_T LBRACE number RBRACE
+    | ID VECTOR_T LBRACE number RBRACE nullable
     {
       $$ = new AttrInfoSqlNode;
       $$->type = AttrType::VECTORS;
       $$->name = $1;
       $$->length = 1 + 4 * $4;
+      $$->nullable = $6;
       free($1);
     }
-    | ID type
+    | ID type nullable
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = 4;
+      $$->nullable = $3;
       free($1);
     }
     ;
+
+nullable:
+    /* empty */
+    {
+      $$ = true;
+    }
+    | NIL
+    {
+      $$ = true;
+    }
+    | NOT NIL
+    {
+      $$ = false;
+    }
+    ;
+
 number:
     NUMBER {$$ = $1;}
     ;
@@ -455,6 +478,10 @@ value:
     }
     |FLOAT {
       $$ = new Value((float)$1);
+      @$ = @1;
+    }
+    |NIL {
+      $$ = new Value(AttrType::NULLS, nullptr);
       @$ = @1;
     }
     |SSS {
@@ -722,6 +749,20 @@ condition:
       $$->left  = std::unique_ptr<Expression>($1);
       $$->right = std::unique_ptr<Expression>($3);
     }
+    | expression IS NIL
+    {
+      $$        = new ConditionSqlNode;
+      $$->comp  = IS_NULL;
+      $$->left  = std::unique_ptr<Expression>($1);
+      $$->right = std::unique_ptr<Expression>(new ValueExpr(Value(AttrType::NULLS, nullptr)));
+    }
+    | expression IS NOT NIL
+    {
+      $$        = new ConditionSqlNode;
+      $$->comp  = NOT_NULL;
+      $$->left  = std::unique_ptr<Expression>($1);
+      $$->right = std::unique_ptr<Expression>(new ValueExpr(Value(AttrType::NULLS, nullptr)));
+    }
     ;
 
 comp_op:
@@ -732,7 +773,7 @@ comp_op:
     | GE { $$ = GREAT_EQUAL; }
     | NE { $$ = NOT_EQUAL; }
     | LK { $$ = LIKE; }
-    | NL { $$ = NOT_LIKE; }
+    | NOT LK { $$ = NOT_LIKE; }
     ;
 
 group_by:

@@ -132,14 +132,9 @@ Value &Value::operator=(Value &&other)
 
 void Value::reset()
 {
-  switch (attr_type_) {
-    case AttrType::CHARS:
-      if (own_data_ && value_.pointer_value_ != nullptr) {
-        delete[] value_.pointer_value_;
-        value_.pointer_value_ = nullptr;
-      }
-      break;
-    default: break;
+  if (own_data_ && value_.pointer_value_ != nullptr) {
+    delete[] value_.pointer_value_;
+    value_.pointer_value_ = nullptr;
   }
 
   attr_type_ = AttrType::UNDEFINED;
@@ -150,6 +145,9 @@ void Value::reset()
 void Value::set_data(char *data, int length)
 {
   switch (attr_type_) {
+    case AttrType::NULLS: {
+      set_null();
+    } break;
     case AttrType::CHARS: {
       set_string(data, length);
     } break;
@@ -176,6 +174,12 @@ void Value::set_data(char *data, int length)
       LOG_WARN("unknown data type: %d", attr_type_);
     } break;
   }
+}
+
+void Value::set_null()
+{
+  reset();
+  attr_type_ = AttrType::NULLS;
 }
 
 void Value::set_int(int val)
@@ -248,6 +252,9 @@ void Value::set_vector(const char *s, int len)
 void Value::set_value(const Value &value)
 {
   switch (value.attr_type_) {
+    case AttrType::NULLS: {
+      set_null();
+    } break;
     case AttrType::INTS: {
       set_int(value.get_int());
     } break;
@@ -295,6 +302,9 @@ void Value::set_vector_from_other(const Value &other)
 const char *Value::data() const
 {
   switch (attr_type_) {
+    case AttrType::NULLS: {
+      return nullptr;
+    } break;
     case AttrType::CHARS:
     case AttrType::VECTORS: {
       return value_.pointer_value_;
@@ -317,6 +327,8 @@ string Value::to_string() const
 }
 
 int Value::compare(const Value &other) const { return DataType::type_instance(this->attr_type_)->compare(*this, other); }
+
+bool Value::is_null() const { return attr_type_ == AttrType::NULLS; }
 
 int Value::get_int() const
 {
@@ -379,6 +391,9 @@ string Value::get_string() const { return this->to_string(); }
 bool Value::get_boolean() const
 {
   switch (attr_type_) {
+    case AttrType::NULLS: {
+      return false;
+    } break;
     case AttrType::CHARS: {
       try {
         float val = std::stof(value_.pointer_value_);

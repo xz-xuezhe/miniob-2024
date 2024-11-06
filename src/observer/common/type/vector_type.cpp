@@ -79,6 +79,28 @@ int VectorType::compare(const Value &left, const Value &right) const
   return 0;
 }
 
+RC VectorType::cast_to(const Value &val, AttrType type, Value &result) const
+{
+  switch (type) {
+    case AttrType::NULLS: {
+      result.set_null();
+    } break;
+    default: return RC::UNIMPLEMENTED;
+  }
+  return RC::SUCCESS;
+}
+
+int VectorType::cast_cost(AttrType type)
+{
+  if (type == AttrType::VECTORS) {
+    return 0;
+  }
+  if (type == AttrType::NULLS) {
+    return 1;
+  }
+  return INT32_MAX;
+}
+
 RC VectorType::add(const Value &left, const Value &right, Value &result) const
 {
   RC           rc        = RC::SUCCESS;

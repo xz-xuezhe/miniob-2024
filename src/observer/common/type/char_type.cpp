@@ -31,6 +31,9 @@ RC CharType::set_value_from_str(Value &val, const string &data) const
 RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
 {
   switch (type) {
+    case AttrType::NULLS: {
+      result.set_null();
+    } break;
     case AttrType::FLOATS: {
       result.attr_type_ = type;
       float         x   = 0;
@@ -104,6 +107,9 @@ int CharType::cast_cost(AttrType type)
 {
   if (type == AttrType::CHARS) {
     return 0;
+  }
+  if (type == AttrType::NULLS) {
+    return 1;
   }
   if (type == AttrType::FLOATS) {
     return 1;

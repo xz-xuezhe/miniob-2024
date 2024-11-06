@@ -65,6 +65,14 @@ RC OrderByPhysicalOperator::open(Trx *trx)
           const pair<vector<pair<Value, bool>>, ValueListTuple> &r) {
         ASSERT(l.first.size() == r.first.size(), "length should be same");
         for (size_t i = 0; i != l.first.size(); i++) {
+          bool bl = l.first[i].first.is_null();
+          bool br = r.first[i].first.is_null();
+          if (bl && br)
+            continue;
+          if (bl)
+            return true;
+          if (br)
+            return false;
           int result = l.first[i].first.compare(r.first[i].first);
           if (result == 0)
             continue;

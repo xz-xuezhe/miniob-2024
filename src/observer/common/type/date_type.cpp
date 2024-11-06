@@ -4,7 +4,6 @@
 #include "common/log/log.h"
 #include "common/type/date_type.h"
 #include "common/value.h"
-#include <iomanip>
 
 int DateType::compare(const Value &left, const Value &right) const
 {
@@ -12,6 +11,28 @@ int DateType::compare(const Value &left, const Value &right) const
   ASSERT(right.attr_type() == AttrType::DATES, "right type is not date");
   if (right.attr_type() == AttrType::DATES) {
     return common::compare_int((void *)&left.value_.int_value_, (void *)&right.value_.int_value_);
+  }
+  return INT32_MAX;
+}
+
+RC DateType::cast_to(const Value &val, AttrType type, Value &result) const
+{
+  switch (type) {
+    case AttrType::NULLS: {
+      result.set_null();
+    } break;
+    default: return RC::UNIMPLEMENTED;
+  }
+  return RC::SUCCESS;
+}
+
+int DateType::cast_cost(AttrType type)
+{
+  if (type == AttrType::DATES) {
+    return 0;
+  }
+  if (type == AttrType::NULLS) {
+    return 1;
   }
   return INT32_MAX;
 }

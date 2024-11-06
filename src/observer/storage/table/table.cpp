@@ -313,10 +313,18 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   char *record_data = (char *)malloc(record_size);
   memset(record_data, 0, record_size);
 
+  const FieldMeta *null_field = table_meta_.null_field();
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &    value = values[i];
-    if (field->type() != value.attr_type()) {
+    if (value.is_null()) {
+      if (!field->nullable()) {
+        LOG_WARN("assign null to not-null field. table name:%s,field name:%s", table_meta_.name(), field->name());
+        rc = RC::INVALID_ARGUMENT;
+        break;
+      }
+      record_data[null_field->offset() + (i >> 3)] |= 1 << (i & 7);
+    } else if (field->type() != value.attr_type()) {
       Value real_value;
       rc = Value::cast_to(value, field->type(), real_value);
       if (OB_FAIL(rc)) {
@@ -325,8 +333,12 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
         break;
       }
       rc = set_value_to_record(record_data, real_value, field);
+      if (OB_SUCC(rc))
+        record_data[null_field->offset() + (field->field_id() >> 3)] &= ~(1 << (field->field_id() & 7));
     } else {
       rc = set_value_to_record(record_data, value, field);
+      if (OB_SUCC(rc))
+        record_data[null_field->offset() + (field->field_id() >> 3)] &= ~(1 << (field->field_id() & 7));
     }
   }
   if (OB_FAIL(rc)) {
@@ -555,7 +567,15 @@ RC Table::update_record(Record &record, const FieldMeta *field, const Value &val
            "failed to delete entry from index. table name=%s, index name=%s, rid=%s, rc=%s",
            name(), index->index_meta().name(), record.rid().to_string().c_str(), strrc(rc));
   }
-  if (field->type() != value.attr_type()) {
+  const FieldMeta *null_field = table_meta_.null_field();
+  if (value.is_null()) {
+    if (!field->nullable()) {
+      LOG_WARN("assign null to not-null field. table name:%s,field name:%s", table_meta_.name(), field->name());
+      rc = RC::INVALID_ARGUMENT;
+    }
+    memset(record.data() + field->offset(), 0, field->len());
+    record.data()[null_field->offset() + (field->field_id() >> 3)] |= 1 << (field->field_id() & 7);
+  }if (field->type() != value.attr_type()) {
     Value real_value;
     rc = Value::cast_to(value, field->type(), real_value);
     if (OB_FAIL(rc)) {
@@ -565,8 +585,12 @@ RC Table::update_record(Record &record, const FieldMeta *field, const Value &val
       return rc;
     }
     rc = set_value_to_record(record.data(), real_value, field);
+    if (OB_SUCC(rc))
+      record.data()[null_field->offset() + (field->field_id() >> 3)] &= ~(1 << (field->field_id() & 7));
   } else {
     rc = set_value_to_record(record.data(), value, field);
+    if (OB_SUCC(rc))
+      record.data()[null_field->offset() + (field->field_id() >> 3)] &= ~(1 << (field->field_id() & 7));
   }
   rc = record_handler_->update_record(record.rid(), record.data());
   rc = insert_entry_of_indexes(record.data(), record.rid());
