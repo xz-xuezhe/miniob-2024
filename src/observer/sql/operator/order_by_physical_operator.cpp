@@ -59,34 +59,55 @@ RC OrderByPhysicalOperator::open(Trx *trx)
     LOG_WARN("failed to close child oper. rc=%s", strrc(rc));
     return rc;
   }
-  sort(tuples_.begin(),
-      tuples_.end(),
-      [](const pair<vector<pair<Value, bool>>, ValueListTuple> & l,
-          const pair<vector<pair<Value, bool>>, ValueListTuple> &r) {
-        ASSERT(l.first.size() == r.first.size(), "length should be same");
-        for (size_t i = 0; i != l.first.size(); i++) {
-          bool bl = l.first[i].first.is_null();
-          bool br = r.first[i].first.is_null();
-          if (bl && br)
-            continue;
-          if (bl)
-            return true == l.first[i].second;
-          if (br)
-            return false == l.first[i].second;
-          int result = l.first[i].first.compare(r.first[i].first);
-          if (result == 0)
-            continue;
-          return (result < 0) == l.first[i].second;
-        }
-        return false;
-      });
+  if (tuples_.empty()) {
+    first_ = false;
+    tuples_it_ = tuples_.end();
+    return RC::SUCCESS;
+  }
+  first_ = true;
+  comparator_ = [](const pair<vector<pair<Value, bool>>, ValueListTuple> & l,
+                    const pair<vector<pair<Value, bool>>, ValueListTuple> &r) {
+    ASSERT(l.first.size() == r.first.size(), "length should be same");
+    for (size_t i = 0; i != l.first.size(); i++) {
+      bool bl = l.first[i].first.is_null();
+      bool br = r.first[i].first.is_null();
+      if (bl && br)
+        continue;
+      if (bl)
+        return true == l.first[i].second;
+      if (br)
+        return false == l.first[i].second;
+      int result = l.first[i].first.compare(r.first[i].first);
+      if (result == 0)
+        continue;
+      return (result < 0) == l.first[i].second;
+    }
+    return false;
+  };
+  auto argmin = tuples_.begin();
+  for (auto it = tuples_.begin() + 1; it != tuples_.end(); ++it) {
+    if (comparator_(*it, *argmin))
+      argmin = it;
+  }
+  min_ = argmin->second;
+  tuples_.erase(argmin);
+  argmin = tuples_.end();
   trx_       = trx;
   tuples_it_ = tuples_.begin();
+  current_tuple_ = nullptr;
   return rc;
 }
 
 RC OrderByPhysicalOperator::next()
 {
+  if (first_) {
+    if (current_tuple_ == nullptr) {
+      current_tuple_ = &min_;
+      return RC::SUCCESS;
+    }
+    sort(tuples_.begin(), tuples_.end(), comparator_);
+    first_ = false;
+  }
   if (tuples_it_ == tuples_.end())
     return RC::RECORD_EOF;
   current_tuple_ = &tuples_it_++->second;
@@ -95,6 +116,8 @@ RC OrderByPhysicalOperator::next()
 
 RC OrderByPhysicalOperator::close()
 {
+  current_tuple_ = nullptr;
+  order_by_.clear();
   tuples_.clear();
   tuples_it_ = tuples_.end();
   return RC::SUCCESS;

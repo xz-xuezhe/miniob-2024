@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include "sql/expr/tuple.h"
 #include "sql/operator/physical_operator.h"
 #include "sql/parser/parse.h"
 
@@ -40,5 +41,10 @@ private:
   vector<pair<unique_ptr<Expression>, bool>>                                  order_by_;  //! 排序对象
   std::vector<std::pair<std::vector<std::pair<Value, bool>>, ValueListTuple>> tuples_;    //! 排序完成后的记录
   std::vector<std::pair<std::vector<std::pair<Value, bool>>, ValueListTuple>>::iterator tuples_it_;  //! 当前记录
+  bool                                                                                  first_;
+  ValueListTuple                                                                        min_;
   Tuple *                                                                               current_tuple_ = nullptr;
+  std::function<bool(
+      const pair<vector<pair<Value, bool>>, ValueListTuple> &, const pair<vector<pair<Value, bool>>, ValueListTuple> &)>
+      comparator_;
 };
