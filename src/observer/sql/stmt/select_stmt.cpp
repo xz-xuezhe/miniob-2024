@@ -82,6 +82,25 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     }
   }
 
+  for (unique_ptr<ConditionSqlNode> &condition : select_sql.having) {
+    vector<unique_ptr<Expression>> bound_conditions;
+    RC rc = RC::SUCCESS;
+    rc = expression_binder.bind_expression(condition->left, bound_conditions);
+    if (OB_FAIL(rc)) {
+      LOG_WARN("bind condition failed. rc=%s", strrc(rc));
+      return rc;
+    }
+    condition->left = std::move(bound_conditions[0]);
+    bound_conditions.clear();
+    rc = expression_binder.bind_expression(condition->right, bound_conditions);
+    if (OB_FAIL(rc)) {
+      LOG_WARN("bind condition failed. rc=%s", strrc(rc));
+      return rc;
+    }
+    condition->right = std::move(bound_conditions[0]);
+    bound_conditions.clear();
+  }
+
   vector<pair<unique_ptr<Expression>, bool>> order_by;
   vector<unique_ptr<Expression>> order_by_expressions;
   for (pair<unique_ptr<Expression>, bool> &item : select_sql.order_by) {
@@ -129,6 +148,13 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     LOG_WARN("cannot construct filter stmt");
     return rc;
   }
+  FilterStmt *having = nullptr;
+  rc                 = FilterStmt::create(
+      db, default_table, &table_map, select_sql.having.data(), static_cast<int>(select_sql.having.size()), having);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("cannot construct having filter stmt");
+    return rc;
+  }
 
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
@@ -136,8 +162,9 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->tables_.swap(tables);
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
+  select_stmt->having_      = having;
   select_stmt->group_by_.swap(group_by_expressions);
   select_stmt->order_by_.swap(order_by);
-  stmt                      = select_stmt;
+  stmt = select_stmt;
   return RC::SUCCESS;
 }

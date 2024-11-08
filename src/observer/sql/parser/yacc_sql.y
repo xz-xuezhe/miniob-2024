@@ -105,6 +105,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         FROM
         INNER_JOIN
         WHERE
+        HAVING
         NOT
         AND
         SET
@@ -173,6 +174,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <value_list>          value_list
 %type <join_list>           join_list
 %type <condition_list>      where
+%type <condition_list>      having
 %type <condition_list>      condition_list
 %type <string>              storage_format
 %type <relation_list>       rel_list
@@ -529,7 +531,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list join_list where group_by order_by
+    SELECT expression_list FROM rel_list join_list where group_by having order_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -559,8 +561,13 @@ select_stmt:        /*  select 语句的语法解析树*/
       }
 
       if ($8 != nullptr) {
-        $$->selection.order_by.swap(*$8);
+        $$->selection.having.swap(*$8);
         delete $8;
+      }
+
+      if ($9 != nullptr) {
+        $$->selection.order_by.swap(*$9);
+        delete $9;
       }
     }
     ;
@@ -823,6 +830,16 @@ order_by:
     | ORDER BY order_by_list
     {
       $$ = $3;
+    }
+    ;
+
+having:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | HAVING condition_list {
+      $$ = $2;
     }
     ;
 

@@ -195,7 +195,12 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
   if (group_by_oper) {
     if (*last_oper) {
-      group_by_oper->add_child(std::move(*last_oper));
+      if (group_by_oper->type() == LogicalOperatorType::GROUP_BY) {
+        group_by_oper->add_child(std::move(*last_oper));
+      } else {
+        ASSERT(group_by_oper->children().size() == 1, "the number of children of having is not 1");
+        group_by_oper->children()[0]->add_child(std::move(*last_oper));
+      }
     }
 
     last_oper = &group_by_oper;
@@ -465,6 +470,16 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
     collector(expression);
   }
 
+  for (FilterUnit *filter_unit : select_stmt->having()->filter_units()) {
+    find_unbound_column(filter_unit->left());
+    find_unbound_column(filter_unit->right());
+  }
+
+  for (FilterUnit *filter_unit : select_stmt->having()->filter_units()) {
+    collector(filter_unit->left());
+    collector(filter_unit->right());
+  }
+
   if (group_by_expressions.empty() && aggregate_expressions.empty()) {
     // 既没有group by也没有聚合函数，不需要group by
     return RC::SUCCESS;
@@ -477,9 +492,18 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
 
   // 如果只需要聚合，但是没有group by 语句，需要生成一个空的group by 语句
 
-  auto group_by_oper = make_unique<GroupByLogicalOperator>(std::move(group_by_expressions),
-                                                           std::move(aggregate_expressions));
-  logical_operator = std::move(group_by_oper);
+  unique_ptr<LogicalOperator> group_by_oper =
+      make_unique<GroupByLogicalOperator>(std::move(group_by_expressions), std::move(aggregate_expressions));
+  if (!select_stmt->having()->filter_units().empty()) {
+    unique_ptr<LogicalOperator> having_oper;
+    RC rc = create_plan(select_stmt->having(), having_oper);
+    if (OB_FAIL(rc))
+      return rc;
+    having_oper->add_child(std::move(group_by_oper));
+    logical_operator = std::move(having_oper);
+  } else {
+    logical_operator = std::move(group_by_oper);
+  }
   return RC::SUCCESS;
 }
 

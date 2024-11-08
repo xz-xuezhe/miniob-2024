@@ -99,6 +99,7 @@ CALC                                    RETURN_TOKEN(CALC);
 FROM                                    RETURN_TOKEN(FROM);
 "INNER JOIN"                            RETURN_TOKEN(INNER_JOIN);
 WHERE                                   RETURN_TOKEN(WHERE);
+HAVING                                  RETURN_TOKEN(HAVING);
 NOT                                     RETURN_TOKEN(NOT);
 AND                                     RETURN_TOKEN(AND);
 INSERT                                  RETURN_TOKEN(INSERT);
