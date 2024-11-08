@@ -143,6 +143,8 @@ public:
         return rc;
       }
 
+      if (this_value.is_null() && other_value.is_null())
+        continue;
       result = this_value.compare(other_value);
       if (0 != result) {
         return rc;
