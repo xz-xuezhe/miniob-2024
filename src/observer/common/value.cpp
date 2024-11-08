@@ -148,6 +148,11 @@ void Value::reset()
 
 void Value::set_data(char *data, int length)
 {
+  if (own_data_ && value_.pointer_value_ != nullptr) {
+    delete[] value_.pointer_value_;
+    value_.pointer_value_ = nullptr;
+    own_data_ = false;
+  }
   switch (attr_type_) {
     case AttrType::NULLS: {
       set_null();
