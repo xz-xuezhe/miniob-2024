@@ -423,10 +423,7 @@ RC ExpressionBinder::bind_aggregate_expression(
     return rc;
   }
 
-  if (unbound_aggregate_expr->children().size() != 1)
-    return RC::INVALID_ARGUMENT;
-
-  unique_ptr<Expression>        &child_expr = unbound_aggregate_expr->children()[0];
+  unique_ptr<Expression>        &child_expr = unbound_aggregate_expr->child();
   vector<unique_ptr<Expression>> child_bound_expressions;
 
   if (child_expr->type() == ExprType::STAR && aggregate_type == AggregateExpr::Type::COUNT) {
