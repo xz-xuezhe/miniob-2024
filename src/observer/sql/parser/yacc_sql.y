@@ -117,6 +117,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         EXPLAIN
         STORAGE
         FORMAT
+        WITH
         AS
         EQ
         LT
@@ -202,6 +203,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            show_tables_stmt
 %type <sql_node>            desc_table_stmt
 %type <sql_node>            create_index_stmt
+%type <sql_node>            create_vector_index_stmt
 %type <sql_node>            drop_index_stmt
 %type <sql_node>            sync_stmt
 %type <sql_node>            begin_stmt
@@ -239,6 +241,7 @@ command_wrapper:
   | show_tables_stmt
   | desc_table_stmt
   | create_index_stmt
+  | create_vector_index_stmt
   | drop_index_stmt
   | sync_stmt
   | begin_stmt
@@ -344,6 +347,21 @@ drop_index_stmt:      /*drop index 语句的语法解析树*/
       free($5);
     }
     ;
+
+create_vector_index_stmt:
+    CREATE VECTOR_T INDEX ID ON ID LBRACE ID RBRACE WITH LBRACE ID EQ L2_DISTANCE COMMA ID EQ ID COMMA ID EQ NUMBER COMMA ID EQ NUMBER RBRACE
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_VECTOR_INDEX);
+    };
+    | CREATE VECTOR_T INDEX ID ON ID LBRACE ID RBRACE WITH LBRACE ID EQ COSINE_DISTANCE COMMA ID EQ ID COMMA ID EQ NUMBER COMMA ID EQ NUMBER RBRACE
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_VECTOR_INDEX);
+    };
+    | CREATE VECTOR_T INDEX ID ON ID LBRACE ID RBRACE WITH LBRACE ID EQ INNER_PRODUCT COMMA ID EQ ID COMMA ID EQ NUMBER COMMA ID EQ NUMBER RBRACE
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_VECTOR_INDEX);
+    };
+
 create_table_stmt:    /*create table 语句的语法解析树*/
     CREATE TABLE ID LBRACE attr_def attr_def_list RBRACE storage_format
     {

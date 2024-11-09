@@ -107,24 +107,25 @@ extern int yydebug;
     EXPLAIN = 308,                 /* EXPLAIN  */
     STORAGE = 309,                 /* STORAGE  */
     FORMAT = 310,                  /* FORMAT  */
-    AS = 311,                      /* AS  */
-    EQ = 312,                      /* EQ  */
-    LT = 313,                      /* LT  */
-    GT = 314,                      /* GT  */
-    LE = 315,                      /* LE  */
-    GE = 316,                      /* GE  */
-    NE = 317,                      /* NE  */
-    IS = 318,                      /* IS  */
-    LK = 319,                      /* LK  */
-    L2_DISTANCE = 320,             /* L2_DISTANCE  */
-    COSINE_DISTANCE = 321,         /* COSINE_DISTANCE  */
-    INNER_PRODUCT = 322,           /* INNER_PRODUCT  */
-    NUMBER = 323,                  /* NUMBER  */
-    FLOAT = 324,                   /* FLOAT  */
-    ID = 325,                      /* ID  */
-    AGGREGATE = 326,               /* AGGREGATE  */
-    SSS = 327,                     /* SSS  */
-    UMINUS = 328                   /* UMINUS  */
+    WITH = 311,                    /* WITH  */
+    AS = 312,                      /* AS  */
+    EQ = 313,                      /* EQ  */
+    LT = 314,                      /* LT  */
+    GT = 315,                      /* GT  */
+    LE = 316,                      /* LE  */
+    GE = 317,                      /* GE  */
+    NE = 318,                      /* NE  */
+    IS = 319,                      /* IS  */
+    LK = 320,                      /* LK  */
+    L2_DISTANCE = 321,             /* L2_DISTANCE  */
+    COSINE_DISTANCE = 322,         /* COSINE_DISTANCE  */
+    INNER_PRODUCT = 323,           /* INNER_PRODUCT  */
+    NUMBER = 324,                  /* NUMBER  */
+    FLOAT = 325,                   /* FLOAT  */
+    ID = 326,                      /* ID  */
+    AGGREGATE = 327,               /* AGGREGATE  */
+    SSS = 328,                     /* SSS  */
+    UMINUS = 329                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -133,7 +134,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 134 "yacc_sql.y"
+#line 135 "yacc_sql.y"
 
   ParsedSqlNode *                                            sql_node;
   ConditionSqlNode *                                         condition;
@@ -159,7 +160,7 @@ union YYSTYPE
   float                                                      floats;
   bool                                                       booleans;
 
-#line 163 "yacc_sql.hpp"
+#line 164 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/create_index_stmt.h"
 #include "sql/stmt/create_table_stmt.h"
+#include "sql/stmt/create_vector_index_stmt.h"
 #include "sql/stmt/delete_stmt.h"
 #include "sql/stmt/desc_table_stmt.h"
 #include "sql/stmt/drop_table_stmt.h"
@@ -38,7 +39,8 @@ bool stmt_type_ddl(StmtType type)
     case StmtType::CREATE_TABLE:
     case StmtType::DROP_TABLE:
     case StmtType::DROP_INDEX:
-    case StmtType::CREATE_INDEX: {
+    case StmtType::CREATE_INDEX:
+    case StmtType::CREATE_VECTOR_INDEX: {
       return true;
     }
     default: {
@@ -115,6 +117,10 @@ RC Stmt::create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt)
 
     case SCF_CALC: {
       return CalcStmt::create(sql_node.calc, stmt);
+    }
+
+    case SCF_CREATE_VECTOR_INDEX: {
+      return CreateVectorIndexStmt::create(db, sql_node.create_vector_index, stmt);
     }
 
     default: {

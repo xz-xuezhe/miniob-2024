@@ -128,6 +128,7 @@ ASC                                     RETURN_TOKEN(ASC);
 LIMIT                                   RETURN_TOKEN(LIMIT);
 STORAGE                                 RETURN_TOKEN(STORAGE);
 FORMAT                                  RETURN_TOKEN(FORMAT);
+WITH                                    RETURN_TOKEN(WITH);
 AS                                      RETURN_TOKEN(AS);
 IS                                      RETURN_TOKEN(IS);
 LIKE                                    RETURN_TOKEN(LK);

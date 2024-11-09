@@ -268,6 +268,11 @@ struct ErrorSqlNode
   int         column;
 };
 
+struct CreateVectorIndexSqlNode
+{
+  // nothing
+};
+
 /**
  * @brief 表示一个SQL语句的类型
  * @ingroup SQLParser
@@ -296,6 +301,7 @@ enum SqlCommandFlag
   SCF_EXIT,
   SCF_EXPLAIN,
   SCF_SET_VARIABLE,  ///< 设置变量
+  SCF_CREATE_VECTOR_INDEX,
 };
 /**
  * @brief 表示一个SQL语句
@@ -304,21 +310,22 @@ enum SqlCommandFlag
 class ParsedSqlNode
 {
 public:
-  enum SqlCommandFlag flag;
-  ErrorSqlNode        error;
-  CalcSqlNode         calc;
-  SelectSqlNode       selection;
-  InsertSqlNode       insertion;
-  DeleteSqlNode       deletion;
-  UpdateSqlNode       update;
-  CreateTableSqlNode  create_table;
-  DropTableSqlNode    drop_table;
-  CreateIndexSqlNode  create_index;
-  DropIndexSqlNode    drop_index;
-  DescTableSqlNode    desc_table;
-  LoadDataSqlNode     load_data;
-  ExplainSqlNode      explain;
-  SetVariableSqlNode  set_variable;
+  enum SqlCommandFlag      flag;
+  ErrorSqlNode             error;
+  CalcSqlNode              calc;
+  SelectSqlNode            selection;
+  InsertSqlNode            insertion;
+  DeleteSqlNode            deletion;
+  UpdateSqlNode            update;
+  CreateTableSqlNode       create_table;
+  DropTableSqlNode         drop_table;
+  CreateIndexSqlNode       create_index;
+  DropIndexSqlNode         drop_index;
+  DescTableSqlNode         desc_table;
+  LoadDataSqlNode          load_data;
+  ExplainSqlNode           explain;
+  SetVariableSqlNode       set_variable;
+  CreateVectorIndexSqlNode create_vector_index;
 
 public:
   ParsedSqlNode();
