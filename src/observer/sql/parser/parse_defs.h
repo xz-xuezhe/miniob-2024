@@ -68,7 +68,7 @@ enum CompOp
  */
 struct ConditionSqlNode
 {
-  CompOp      comp;   ///< comparison operator
+  CompOp                      comp;   ///< comparison operator
   std::unique_ptr<Expression> left;   ///< left-hand side expression
   std::unique_ptr<Expression> right;  ///< right-hand side expression
 };
@@ -92,12 +92,12 @@ struct Assignment
 
 struct SelectSqlNode
 {
-  std::vector<std::unique_ptr<Expression>>       expressions;  ///< expressions to be selected
-  std::vector<std::string>                       relations;    ///< from clause
-  std::vector<std::unique_ptr<ConditionSqlNode>> conditions;   ///< where clause
-  std::vector<std::unique_ptr<Expression>>       group_by;     ///< group by clause
-  std::vector<std::unique_ptr<ConditionSqlNode>> having;       ///< having clause
-  std::vector<std::pair<std::unique_ptr<Expression>, bool>> order_by;  ///< order by clause
+  std::vector<std::unique_ptr<Expression>>                  expressions;  ///< expressions to be selected
+  std::vector<std::pair<std::string, std::string>>          relations;    ///< from clause
+  std::vector<std::unique_ptr<ConditionSqlNode>>            conditions;   ///< where clause
+  std::vector<std::unique_ptr<Expression>>                  group_by;     ///< group by clause
+  std::vector<std::unique_ptr<ConditionSqlNode>>            having;       ///< having clause
+  std::vector<std::pair<std::unique_ptr<Expression>, bool>> order_by;     ///< order by clause
 };
 
 /**
@@ -160,8 +160,8 @@ struct AttrInfoSqlNode
  */
 struct JoinSqlNode
 {
-  std::vector<std::string>                       relations;   ///< 查询的表
-  std::vector<std::unique_ptr<ConditionSqlNode>> conditions;  ///< 查询条件，使用AND串联起来多个条件
+  std::vector<std::pair<std::string, std::string>> relations;   ///< 查询的表
+  std::vector<std::unique_ptr<ConditionSqlNode>>   conditions;  ///< 查询条件，使用AND串联起来多个条件
 };
 
 /**

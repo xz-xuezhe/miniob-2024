@@ -24,23 +24,29 @@ using namespace common;
 
 Table *BinderContext::find_table(const char *table_name) const
 {
-  auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
+  auto pred = [table_name](const std::pair<std::string, Table *> &alias_table) {
+    return 0 == strcasecmp(table_name, alias_table.first.c_str()) ||
+           0 == strcasecmp(table_name, alias_table.second->name());
+  };
   auto iter = ranges::find_if(query_tables_, pred);
   if (iter == query_tables_.end()) {
     return nullptr;
   }
-  return *iter;
+  return iter->second;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expressions)
+static void wildcard_fields(const char *alias, Table *table, vector<unique_ptr<Expression>> &expressions)
 {
   const TableMeta &table_meta = table->table_meta();
   const int        field_num  = table_meta.field_num();
   for (int i = table_meta.sys_field_num(); i < field_num; i++) {
     Field      field(table, table_meta.field(i));
     FieldExpr *field_expr = new FieldExpr(field);
-    field_expr->set_name(field.field_name());
+    if (alias == nullptr)
+      field_expr->set_name(field.field_name());
+    else
+      field_expr->set_name(alias + string(".") + field.field_name());
     expressions.emplace_back(field_expr);
   }
 }
@@ -113,7 +119,7 @@ RC ExpressionBinder::bind_star_expression(
 
   auto star_expr = static_cast<StarExpr *>(expr.get());
 
-  vector<Table *> tables_to_wildcard;
+  vector<std::pair<const char *, Table *>> tables_to_wildcard;
 
   const char *table_name = star_expr->table_name();
   if (!is_blank(table_name) && 0 != strcmp(table_name, "*")) {
@@ -123,14 +129,16 @@ RC ExpressionBinder::bind_star_expression(
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    tables_to_wildcard.push_back(table);
+    tables_to_wildcard.emplace_back(nullptr, table);
   } else {
-    const vector<Table *> &all_tables = context_.query_tables();
+    std::vector<std::pair<const char *, Table *>> all_tables;
+    for(auto &[alias, table] : context_.query_tables())
+      all_tables.emplace_back(alias.c_str(), table);
     tables_to_wildcard.insert(tables_to_wildcard.end(), all_tables.begin(), all_tables.end());
   }
 
-  for (Table *table : tables_to_wildcard) {
-    wildcard_fields(table, bound_expressions);
+  for (auto &[alias, table] : tables_to_wildcard) {
+    wildcard_fields(tables_to_wildcard.size() != 1 ? alias : nullptr, table, bound_expressions);
   }
 
   return RC::SUCCESS;
@@ -155,7 +163,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    table = context_.query_tables()[0];
+    table = context_.query_tables()[0].second;
   } else {
     table = context_.find_table(table_name);
     if (nullptr == table) {
@@ -165,7 +173,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
   }
 
   if (0 == strcmp(field_name, "*")) {
-    wildcard_fields(table, bound_expressions);
+    wildcard_fields(nullptr, table, bound_expressions);
   } else {
     const FieldMeta *field_meta = table->table_meta().field(field_name);
     if (nullptr == field_meta) {
@@ -175,7 +183,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
-    field_expr->set_name(field_name);
+    field_expr->set_name(expr->name());
     bound_expressions.emplace_back(field_expr);
   }
 

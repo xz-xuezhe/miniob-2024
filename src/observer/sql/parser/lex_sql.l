@@ -127,6 +127,7 @@ ORDER                                   RETURN_TOKEN(ORDER);
 ASC                                     RETURN_TOKEN(ASC);
 STORAGE                                 RETURN_TOKEN(STORAGE);
 FORMAT                                  RETURN_TOKEN(FORMAT);
+AS                                      RETURN_TOKEN(AS);
 IS                                      RETURN_TOKEN(IS);
 LIKE                                    RETURN_TOKEN(LK);
 COUNT                                   yylval->string=strdup(yytext); RETURN_TOKEN(AGGREGATE);

@@ -106,23 +106,24 @@ extern int yydebug;
     EXPLAIN = 307,                 /* EXPLAIN  */
     STORAGE = 308,                 /* STORAGE  */
     FORMAT = 309,                  /* FORMAT  */
-    EQ = 310,                      /* EQ  */
-    LT = 311,                      /* LT  */
-    GT = 312,                      /* GT  */
-    LE = 313,                      /* LE  */
-    GE = 314,                      /* GE  */
-    NE = 315,                      /* NE  */
-    IS = 316,                      /* IS  */
-    LK = 317,                      /* LK  */
-    L2_DISTANCE = 318,             /* L2_DISTANCE  */
-    COSINE_DISTANCE = 319,         /* COSINE_DISTANCE  */
-    INNER_PRODUCT = 320,           /* INNER_PRODUCT  */
-    NUMBER = 321,                  /* NUMBER  */
-    FLOAT = 322,                   /* FLOAT  */
-    ID = 323,                      /* ID  */
-    AGGREGATE = 324,               /* AGGREGATE  */
-    SSS = 325,                     /* SSS  */
-    UMINUS = 326                   /* UMINUS  */
+    AS = 310,                      /* AS  */
+    EQ = 311,                      /* EQ  */
+    LT = 312,                      /* LT  */
+    GT = 313,                      /* GT  */
+    LE = 314,                      /* LE  */
+    GE = 315,                      /* GE  */
+    NE = 316,                      /* NE  */
+    IS = 317,                      /* IS  */
+    LK = 318,                      /* LK  */
+    L2_DISTANCE = 319,             /* L2_DISTANCE  */
+    COSINE_DISTANCE = 320,         /* COSINE_DISTANCE  */
+    INNER_PRODUCT = 321,           /* INNER_PRODUCT  */
+    NUMBER = 322,                  /* NUMBER  */
+    FLOAT = 323,                   /* FLOAT  */
+    ID = 324,                      /* ID  */
+    AGGREGATE = 325,               /* AGGREGATE  */
+    SSS = 326,                     /* SSS  */
+    UMINUS = 327                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -131,7 +132,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 132 "yacc_sql.y"
+#line 133 "yacc_sql.y"
 
   ParsedSqlNode *                                            sql_node;
   ConditionSqlNode *                                         condition;
@@ -149,6 +150,7 @@ union YYSTYPE
   std::vector<std::unique_ptr<ConditionSqlNode>> *           condition_list;
   std::vector<RelAttrSqlNode> *                              rel_attr_list;
   std::vector<std::string> *                                 relation_list;
+  std::vector<std::pair<std::string, std::string>> *         rel_alias_list;
   std::pair<std::unique_ptr<Expression>, bool> *             order_by_item;
   std::vector<std::pair<std::unique_ptr<Expression>, bool>> *order_by_list;
   char *                                                     string;
@@ -156,7 +158,7 @@ union YYSTYPE
   float                                                      floats;
   bool                                                       booleans;
 
-#line 160 "yacc_sql.hpp"
+#line 162 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

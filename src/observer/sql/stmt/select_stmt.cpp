@@ -44,11 +44,14 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   vector<Table *>                tables;
   unordered_map<string, Table *> table_map;
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
-    const char *table_name = select_sql.relations[i].c_str();
+    const char *table_name = select_sql.relations[i].first.c_str();
     if (nullptr == table_name) {
       LOG_WARN("invalid argument. relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
     }
+    const char *alias = select_sql.relations[i].second.c_str();
+    if (common::is_blank(alias))
+      alias = table_name;
 
     Table *table = db->find_table(table_name);
     if (nullptr == table) {
@@ -56,9 +59,9 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
-    binder_context.add_table(table);
+    binder_context.add_table(alias, table);
     tables.push_back(table);
-    table_map.insert({table_name, table});
+    table_map.insert({alias, table});
   }
 
   // collect query fields in `select` statement

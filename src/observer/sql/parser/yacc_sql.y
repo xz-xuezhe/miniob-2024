@@ -116,6 +116,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         EXPLAIN
         STORAGE
         FORMAT
+        AS
         EQ
         LT
         GT
@@ -146,6 +147,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   std::vector<std::unique_ptr<ConditionSqlNode>> *           condition_list;
   std::vector<RelAttrSqlNode> *                              rel_attr_list;
   std::vector<std::string> *                                 relation_list;
+  std::vector<std::pair<std::string, std::string>> *         rel_alias_list;
   std::pair<std::unique_ptr<Expression>, bool> *             order_by_item;
   std::vector<std::pair<std::unique_ptr<Expression>, bool>> *order_by_list;
   char *                                                     string;
@@ -178,6 +180,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <condition_list>      condition_list
 %type <string>              storage_format
 %type <relation_list>       rel_list
+%type <rel_alias_list>      rel_alias_list
 %type <assignment>          assignment
 %type <assignment_list>     assignment_list
 %type <expression>          expression
@@ -531,7 +534,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list join_list where group_by having order_by
+    SELECT expression_list FROM rel_alias_list join_list where group_by having order_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -609,10 +612,46 @@ expression_list:
       $$ = new std::vector<std::unique_ptr<Expression>>;
       $$->emplace_back($1);
     }
+    | expression ID
+    {
+      $1->set_name($2);
+      free $2;
+      $$ = new std::vector<std::unique_ptr<Expression>>;
+      $$->emplace_back($1);
+    }
+    | expression AS ID
+    {
+      $1->set_name($3);
+      free $3;
+      $$ = new std::vector<std::unique_ptr<Expression>>;
+      $$->emplace_back($1);
+    }
     | expression COMMA expression_list
     {
       if ($3 != nullptr) {
         $$ = $3;
+      } else {
+        $$ = new std::vector<std::unique_ptr<Expression>>;
+      }
+      $$->emplace($$->begin(), $1);
+    }
+    | expression ID COMMA expression_list
+    {
+      $1->set_name($2);
+      free $2;
+      if ($4 != nullptr) {
+        $$ = $4;
+      } else {
+        $$ = new std::vector<std::unique_ptr<Expression>>;
+      }
+      $$->emplace($$->begin(), $1);
+    }
+    | expression AS ID COMMA expression_list
+    {
+      $1->set_name($3);
+      free $3;
+      if ($5 != nullptr) {
+        $$ = $5;
       } else {
         $$ = new std::vector<std::unique_ptr<Expression>>;
       }
@@ -667,6 +706,7 @@ expression:
     }
     | '*' {
       $$ = new StarExpr();
+      $$->set_name("*");
     }
     ;
 
@@ -707,6 +747,38 @@ rel_list:
       free($1);
     }
     ;
+rel_alias_list:
+    relation {
+      $$ = new std::vector<std::pair<std::string, std::string>>();
+      $$->emplace_back($1, "");
+      free($1);
+    }
+    | relation ID {
+      $$ = new std::vector<std::pair<std::string, std::string>>();
+      $$->emplace_back($1, $2);
+      free($1);
+      free($2);
+    }
+    | relation COMMA rel_alias_list {
+      if ($3 != nullptr) {
+        $$ = $3;
+      } else {
+        $$ = new std::vector<std::pair<std::string, std::string>>();
+      }
+      $$->emplace($$->begin(), $1, "");
+      free($1);
+    }
+    | relation ID COMMA rel_alias_list {
+      if ($4 != nullptr) {
+        $$ = $4;
+      } else {
+        $$ = new std::vector<std::pair<std::string, std::string>>();
+      }
+      $$->emplace($$->begin(), $1, $2);
+      free($1);
+      free($2);
+    }
+    ;
 
 join_list:
     /* empty */
@@ -719,10 +791,22 @@ join_list:
         $$ = new JoinSqlNode;
       else
         $$ = $1;
-      $$->relations.emplace_back($3);
+      $$->relations.emplace_back($3, "");
       $$->conditions.insert($$->conditions.end(), std::make_move_iterator($5->begin()), std::make_move_iterator($5->end()));
       free($3);
       delete $5;
+    }
+    | join_list INNER_JOIN relation ID ON condition_list
+    {
+      if ($1 == nullptr)
+        $$ = new JoinSqlNode;
+      else
+        $$ = $1;
+      $$->relations.emplace_back($3, $4);
+      $$->conditions.insert($$->conditions.end(), std::make_move_iterator($6->begin()), std::make_move_iterator($6->end()));
+      free($3);
+      free($4);
+      delete $6;
     }
 
 where:
