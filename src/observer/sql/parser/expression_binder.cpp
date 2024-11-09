@@ -183,7 +183,10 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
-    field_expr->set_name(expr->name());
+    if (context_.query_tables().size() == 1 && strchr(expr->name(), '.') != nullptr)
+      field_expr->set_name(field.field_name());
+    else
+      field_expr->set_name(expr->name());
     bound_expressions.emplace_back(field_expr);
   }
 

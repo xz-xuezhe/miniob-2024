@@ -71,6 +71,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         GROUP
         ORDER
         ASC
+        LIMIT
         TABLE
         TABLES
         UNIQUE
@@ -164,6 +165,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 //非终结符
 
 /** type 定义了各种解析后的结果输出的是什么类型。类型对应了 union 中的定义的成员变量名称 **/
+%type <number>              limit
 %type <number>              type
 %type <condition>           condition
 %type <value>               value
@@ -534,7 +536,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_alias_list join_list where group_by having order_by
+    SELECT expression_list FROM rel_alias_list join_list where group_by having order_by limit
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -572,6 +574,8 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.order_by.swap(*$9);
         delete $9;
       }
+
+      $$->selection.limit = $10;
     }
     ;
 calc_stmt:
@@ -582,6 +586,16 @@ calc_stmt:
       delete $2;
     }
     ;
+
+limit:
+    /* empty */
+    {
+      $$ = -1;
+    }
+    | LIMIT NUMBER
+    {
+      $$ = $2;
+    }
 
 assignment_list:
     assignment

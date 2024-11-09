@@ -16,7 +16,8 @@ See the Mulan PSL v2 for more details. */
 
 using namespace std;
 
-ProjectLogicalOperator::ProjectLogicalOperator(vector<unique_ptr<Expression>> &&expressions)
+ProjectLogicalOperator::ProjectLogicalOperator(vector<unique_ptr<Expression>> &&expressions, int limit /*= -1*/)
 {
   expressions_ = std::move(expressions);
+  limit_       = limit;
 }
