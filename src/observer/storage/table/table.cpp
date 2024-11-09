@@ -572,6 +572,8 @@ RC Table::update_record(Record &record, const FieldMeta *field, const Value &val
     if (!field->nullable()) {
       LOG_WARN("assign null to not-null field. table name:%s,field name:%s", table_meta_.name(), field->name());
       rc = RC::INVALID_ARGUMENT;
+      insert_entry_of_indexes(record.data(), record.rid());
+      return rc;
     }
     memset(record.data() + field->offset(), 0, field->len());
     record.data()[null_field->offset() + (field->field_id() >> 3)] |= 1 << (field->field_id() & 7);
