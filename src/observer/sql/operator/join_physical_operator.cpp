@@ -26,7 +26,26 @@ RC NestedLoopJoinPhysicalOperator::open(Trx *trx)
   RC rc         = RC::SUCCESS;
   left_         = children_[0].get();
   right_        = children_[1].get();
-  right_closed_ = true;
+  rc = right_->open(trx);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to open right oper. rc=%s", strrc(rc));
+    return rc;
+  }
+  while ((rc = right_->next()) != RC::RECORD_EOF) {
+    if (OB_FAIL(rc))
+      return rc;
+    ValueListTuple temp;
+    rc = ValueListTuple::make(*right_->current_tuple(), temp);
+    if (OB_FAIL(rc))
+      return rc;
+    right_tuples_.push_back(temp);
+  }
+  rc = right_->close();
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to close right oper. rc=%s", strrc(rc));
+    return rc;
+  }
+  right_it_ = right_tuples_.end();
   round_done_   = true;
 
   rc   = left_->open(trx);
@@ -70,15 +89,6 @@ RC NestedLoopJoinPhysicalOperator::close()
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to close left oper. rc=%s", strrc(rc));
   }
-
-  if (!right_closed_) {
-    rc = right_->close();
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to close right oper. rc=%s", strrc(rc));
-    } else {
-      right_closed_ = true;
-    }
-  }
   return rc;
 }
 
@@ -101,33 +111,16 @@ RC NestedLoopJoinPhysicalOperator::right_next()
 {
   RC rc = RC::SUCCESS;
   if (round_done_) {
-    if (!right_closed_) {
-      rc = right_->close();
-
-      right_closed_ = true;
-      if (rc != RC::SUCCESS) {
-        return rc;
-      }
-    }
-
-    rc = right_->open(trx_);
-    if (rc != RC::SUCCESS) {
-      return rc;
-    }
-    right_closed_ = false;
-
+    right_tuple_ = nullptr;
+    right_it_ = right_tuples_.begin();
     round_done_ = false;
   }
 
-  rc = right_->next();
-  if (rc != RC::SUCCESS) {
-    if (rc == RC::RECORD_EOF) {
-      round_done_ = true;
-    }
-    return rc;
+  if (right_it_ == right_tuples_.end()) {
+    round_done_ = true;
+    return RC::RECORD_EOF;
   }
-
-  right_tuple_ = right_->current_tuple();
+  right_tuple_ = &*right_it_++;
   joined_tuple_.set_right(right_tuple_);
   return rc;
 }
