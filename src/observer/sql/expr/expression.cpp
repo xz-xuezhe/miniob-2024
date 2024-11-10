@@ -117,6 +117,10 @@ ComparisonExpr::ComparisonExpr(CompOp comp, unique_ptr<Expression> left, unique_
     : comp_(comp), left_(std::move(left)), right_(std::move(right))
 {}
 
+ComparisonExpr::ComparisonExpr(CompOp comp, Expression *left, Expression *right)
+    : comp_(comp), left_(left), right_(right)
+{}
+
 ComparisonExpr::~ComparisonExpr() {}
 
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const

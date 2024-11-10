@@ -58,21 +58,6 @@ enum CompOp
   NO_OP
 };
 
-/**
- * @brief 表示一个条件比较
- * @ingroup SQLParser
- * @details 条件比较就是SQL查询中的 where a>b 这种。
- * 一个条件比较是有两部分组成的，称为左边和右边。
- * 左边和右边理论上都可以是任意的数据，比如是字段（属性，列），也可以是数值常量。
- * 这个结构中记录的仅仅支持字段和值。
- */
-struct ConditionSqlNode
-{
-  CompOp                      comp;   ///< comparison operator
-  std::unique_ptr<Expression> left;   ///< left-hand side expression
-  std::unique_ptr<Expression> right;  ///< right-hand side expression
-};
-
 struct Assignment
 {
   std::string attribute_name;  ///< 更新的字段，仅支持一个字段
@@ -94,9 +79,9 @@ struct SelectSqlNode
 {
   std::vector<std::unique_ptr<Expression>>                  expressions;  ///< expressions to be selected
   std::vector<std::pair<std::string, std::string>>          relations;    ///< from clause
-  std::vector<std::unique_ptr<ConditionSqlNode>>            conditions;   ///< where clause
+  std::unique_ptr<Expression>                               conditions;   ///< where clause
   std::vector<std::unique_ptr<Expression>>                  group_by;     ///< group by clause
-  std::vector<std::unique_ptr<ConditionSqlNode>>            having;       ///< having clause
+  std::unique_ptr<Expression>                               having;       ///< having clause
   std::vector<std::pair<std::unique_ptr<Expression>, bool>> order_by;     ///< order by clause
   int                                                       limit;        ///< limit clause, -1 if unlimited
 };
@@ -127,8 +112,8 @@ struct InsertSqlNode
  */
 struct DeleteSqlNode
 {
-  std::string                                    relation_name;  ///< Relation to delete from
-  std::vector<std::unique_ptr<ConditionSqlNode>> conditions;
+  std::string                 relation_name;  ///< Relation to delete from
+  std::unique_ptr<Expression> conditions;
 };
 
 /**
@@ -137,9 +122,9 @@ struct DeleteSqlNode
  */
 struct UpdateSqlNode
 {
-  std::string                                     relation_name;  ///< Relation to update
+  std::string                              relation_name;  ///< Relation to update
   std::vector<std::unique_ptr<Assignment>> assignments;    ///< 更新操作
-  std::vector<std::unique_ptr<ConditionSqlNode>>  conditions;
+  std::unique_ptr<Expression>              conditions;
 };
 
 /**
@@ -162,7 +147,7 @@ struct AttrInfoSqlNode
 struct JoinSqlNode
 {
   std::vector<std::pair<std::string, std::string>> relations;   ///< 查询的表
-  std::vector<std::unique_ptr<ConditionSqlNode>>   conditions;  ///< 查询条件，使用AND串联起来多个条件
+  std::unique_ptr<Expression>                      conditions;  ///< 查询条件，使用AND串联起来多个条件
 };
 
 /**

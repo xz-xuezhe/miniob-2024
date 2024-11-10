@@ -72,6 +72,22 @@ RC ConjunctionSimplificationRule::rewrite(std::unique_ptr<Expression> &expr, boo
       }
     }
   }
+
+  for (int i = 0; i < static_cast<int>(child_exprs.size()); i++) {
+    auto &child_expr = child_exprs[i];
+    if (child_expr->type() != ExprType::CONJUNCTION)
+      continue;
+    ConjunctionExpr *conjunction_child_expr = static_cast<ConjunctionExpr *>(child_expr.get());
+    if (conjunction_expr->conjunction_type() == conjunction_child_expr->conjunction_type()) {
+      change_made = true;
+      child_exprs.insert(child_exprs.end(),
+          std::make_move_iterator(conjunction_child_expr->children().begin()),
+          std::make_move_iterator(conjunction_child_expr->children().end()));
+      child_exprs.erase(child_exprs.begin() + i);
+      --i;
+    }
+  }
+
   if (child_exprs.size() == 1) {
     LOG_TRACE("conjunction expression has only 1 child");
     std::unique_ptr<Expression> child_expr = std::move(child_exprs.front());

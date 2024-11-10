@@ -97,35 +97,36 @@ extern int yydebug;
     INNER_JOIN = 298,              /* INNER_JOIN  */
     WHERE = 299,                   /* WHERE  */
     HAVING = 300,                  /* HAVING  */
-    NOT = 301,                     /* NOT  */
+    OR = 301,                      /* OR  */
     AND = 302,                     /* AND  */
-    SET = 303,                     /* SET  */
-    ON = 304,                      /* ON  */
-    LOAD = 305,                    /* LOAD  */
-    DATA = 306,                    /* DATA  */
-    INFILE = 307,                  /* INFILE  */
-    EXPLAIN = 308,                 /* EXPLAIN  */
-    STORAGE = 309,                 /* STORAGE  */
-    FORMAT = 310,                  /* FORMAT  */
-    WITH = 311,                    /* WITH  */
-    AS = 312,                      /* AS  */
-    EQ = 313,                      /* EQ  */
-    LT = 314,                      /* LT  */
-    GT = 315,                      /* GT  */
-    LE = 316,                      /* LE  */
-    GE = 317,                      /* GE  */
-    NE = 318,                      /* NE  */
-    IS = 319,                      /* IS  */
-    LK = 320,                      /* LK  */
-    L2_DISTANCE = 321,             /* L2_DISTANCE  */
-    COSINE_DISTANCE = 322,         /* COSINE_DISTANCE  */
-    INNER_PRODUCT = 323,           /* INNER_PRODUCT  */
-    NUMBER = 324,                  /* NUMBER  */
-    FLOAT = 325,                   /* FLOAT  */
-    ID = 326,                      /* ID  */
-    AGGREGATE = 327,               /* AGGREGATE  */
-    SSS = 328,                     /* SSS  */
-    UMINUS = 329                   /* UMINUS  */
+    NOT = 303,                     /* NOT  */
+    SET = 304,                     /* SET  */
+    ON = 305,                      /* ON  */
+    LOAD = 306,                    /* LOAD  */
+    DATA = 307,                    /* DATA  */
+    INFILE = 308,                  /* INFILE  */
+    EXPLAIN = 309,                 /* EXPLAIN  */
+    STORAGE = 310,                 /* STORAGE  */
+    FORMAT = 311,                  /* FORMAT  */
+    WITH = 312,                    /* WITH  */
+    AS = 313,                      /* AS  */
+    EQ = 314,                      /* EQ  */
+    LT = 315,                      /* LT  */
+    GT = 316,                      /* GT  */
+    LE = 317,                      /* LE  */
+    GE = 318,                      /* GE  */
+    NE = 319,                      /* NE  */
+    IS = 320,                      /* IS  */
+    LK = 321,                      /* LK  */
+    L2_DISTANCE = 322,             /* L2_DISTANCE  */
+    COSINE_DISTANCE = 323,         /* COSINE_DISTANCE  */
+    INNER_PRODUCT = 324,           /* INNER_PRODUCT  */
+    NUMBER = 325,                  /* NUMBER  */
+    FLOAT = 326,                   /* FLOAT  */
+    ID = 327,                      /* ID  */
+    AGGREGATE = 328,               /* AGGREGATE  */
+    SSS = 329,                     /* SSS  */
+    UMINUS = 330                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -134,10 +135,10 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 135 "yacc_sql.y"
+#line 136 "yacc_sql.y"
 
   ParsedSqlNode *                                            sql_node;
-  ConditionSqlNode *                                         condition;
+  Expression *                                               condition;
   Value *                                                    value;
   enum CompOp                                                comp;
   RelAttrSqlNode *                                           rel_attr;
@@ -149,7 +150,7 @@ union YYSTYPE
   std::vector<std::unique_ptr<Expression>> *                 expression_list;
   std::vector<Value> *                                       value_list;
   JoinSqlNode *                                              join_list;
-  std::vector<std::unique_ptr<ConditionSqlNode>> *           condition_list;
+  Expression *                                               condition_list;
   std::vector<RelAttrSqlNode> *                              rel_attr_list;
   std::vector<std::string> *                                 relation_list;
   std::vector<std::pair<std::string, std::string>> *         rel_alias_list;
@@ -160,7 +161,7 @@ union YYSTYPE
   float                                                      floats;
   bool                                                       booleans;
 
-#line 164 "yacc_sql.hpp"
+#line 165 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

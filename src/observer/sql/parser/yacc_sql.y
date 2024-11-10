@@ -107,8 +107,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         INNER_JOIN
         WHERE
         HAVING
-        NOT
+        OR
         AND
+        NOT
         SET
         ON
         LOAD
@@ -134,7 +135,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
   ParsedSqlNode *                                            sql_node;
-  ConditionSqlNode *                                         condition;
+  Expression *                                               condition;
   Value *                                                    value;
   enum CompOp                                                comp;
   RelAttrSqlNode *                                           rel_attr;
@@ -146,7 +147,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   std::vector<std::unique_ptr<Expression>> *                 expression_list;
   std::vector<Value> *                                       value_list;
   JoinSqlNode *                                              join_list;
-  std::vector<std::unique_ptr<ConditionSqlNode>> *           condition_list;
+  Expression *                                               condition_list;
   std::vector<RelAttrSqlNode> *                              rel_attr_list;
   std::vector<std::string> *                                 relation_list;
   std::vector<std::pair<std::string, std::string>> *         rel_alias_list;
@@ -533,8 +534,7 @@ delete_stmt:    /*  delete 语句的语法解析树*/
       $$ = new ParsedSqlNode(SCF_DELETE);
       $$->deletion.relation_name = $3;
       if ($4 != nullptr) {
-        $$->deletion.conditions.swap(*$4);
-        delete $4;
+        $$->deletion.conditions.reset($4);
       }
       free($3);
     }
@@ -546,8 +546,7 @@ update_stmt:      /*  update 语句的语法解析树*/
       $$->update.relation_name = $2;
       $$->update.assignments.swap(*$4);
       if ($5 != nullptr) {
-        $$->update.conditions.swap(*$5);
-        delete $5;
+        $$->update.conditions.reset($5);
       }
       free($2);
       delete $4;
@@ -568,8 +567,7 @@ select_stmt:        /*  select 语句的语法解析树*/
       }
 
       if ($6 != nullptr) {
-        $$->selection.conditions.swap(*$6);
-        delete $6;
+        $$->selection.conditions.reset($6);
       }
 
       if ($7 != nullptr) {
@@ -579,13 +577,23 @@ select_stmt:        /*  select 语句的语法解析树*/
 
       if ($5 != nullptr) {
         $$->selection.relations.insert($$->selection.relations.end(), std::make_move_iterator($5->relations.begin()), std::make_move_iterator($5->relations.end()));
-        $$->selection.conditions.insert($$->selection.conditions.end(), std::make_move_iterator($5->conditions.begin()), std::make_move_iterator($5->conditions.end()));
+        auto &conditions = $$->selection.conditions;
+        if (conditions == nullptr) {
+          conditions = std::move($5->conditions);
+        } else {
+          if (conditions->type() != ExprType::CONJUNCTION  || ((ConjunctionExpr *)conditions.get())->conjunction_type() != ConjunctionExpr::Type::AND) {
+            std::vector<std::unique_ptr<Expression>> list;
+            list.emplace_back(std::move(conditions));
+            ConjunctionExpr *conj_expr = new ConjunctionExpr(ConjunctionExpr::Type::AND, list);
+            conditions.reset(conj_expr);
+          }
+          ((ConjunctionExpr *)conditions.get())->children().emplace_back(std::move($5->conditions));
+        }
         delete $5;
       }
 
       if ($8 != nullptr) {
-        $$->selection.having.swap(*$8);
-        delete $8;
+        $$->selection.having.reset($8);
       }
 
       if ($9 != nullptr) {
@@ -824,9 +832,18 @@ join_list:
       else
         $$ = $1;
       $$->relations.emplace_back($3, "");
-      $$->conditions.insert($$->conditions.end(), std::make_move_iterator($5->begin()), std::make_move_iterator($5->end()));
+      if ($$->conditions == nullptr) {
+        $$->conditions.reset($5);
+      } else {
+        if ($$->conditions->type() != ExprType::CONJUNCTION || ((ConjunctionExpr *)$$->conditions.get())->conjunction_type() != ConjunctionExpr::Type::AND) {
+          std::vector<std::unique_ptr<Expression>> list;
+          list.emplace_back(std::move($$->conditions));
+          Expression *conj_expr = new ConjunctionExpr(ConjunctionExpr::Type::AND, list);
+          $$->conditions.reset(conj_expr);
+        }
+        ((ConjunctionExpr *)$$->conditions.get())->children().emplace_back($5);
+      }
       free($3);
-      delete $5;
     }
     | join_list INNER_JOIN relation ID ON condition_list
     {
@@ -835,10 +852,19 @@ join_list:
       else
         $$ = $1;
       $$->relations.emplace_back($3, $4);
-      $$->conditions.insert($$->conditions.end(), std::make_move_iterator($6->begin()), std::make_move_iterator($6->end()));
+      if ($$->conditions == nullptr) {
+        $$->conditions.reset($6);
+      } else {
+        if ($$->conditions->type() != ExprType::CONJUNCTION || ((ConjunctionExpr *)$$->conditions.get())->conjunction_type() != ConjunctionExpr::Type::AND) {
+          std::vector<std::unique_ptr<Expression>> list;
+          list.emplace_back(std::move($$->conditions));
+          Expression *conj_expr = new ConjunctionExpr(ConjunctionExpr::Type::AND, list);
+          $$->conditions.reset(conj_expr);
+        }
+        ((ConjunctionExpr *)$$->conditions.get())->children().emplace_back($6);
+      }
       free($3);
       free($4);
-      delete $6;
     }
 
 where:
@@ -851,40 +877,42 @@ where:
     }
     ;
 condition_list:
-    /* empty */
-    {
-      $$ = nullptr;
-    }
-    | condition {
-      $$ = new std::vector<std::unique_ptr<ConditionSqlNode>>;
-      $$->emplace_back($1);
+    condition {
+      $$ = $1;
     }
     | condition AND condition_list {
       $$ = $3;
-      $$->emplace_back($1);
+      if ($$->type() != ExprType::CONJUNCTION) {
+        std::vector<std::unique_ptr<Expression>> list;
+        list.emplace_back($$);
+        ConjunctionExpr *conj_expr = new ConjunctionExpr(ConjunctionExpr::Type::AND, list);
+        $$ = conj_expr;
+      }
+      ((ConjunctionExpr *)$$)->children().emplace_back($1);
+    }
+    | condition OR condition_list {
+      $$ = $3;
+      if ($$->type() != ExprType::CONJUNCTION) {
+        std::vector<std::unique_ptr<Expression>> list;
+        list.emplace_back($$);
+        ConjunctionExpr *conj_expr = new ConjunctionExpr(ConjunctionExpr::Type::OR, list);
+        $$ = conj_expr;
+      }
+      ((ConjunctionExpr *)$$)->children().emplace_back($1);
     }
     ;
 condition:
     expression comp_op expression
     {
-      $$        = new ConditionSqlNode;
-      $$->comp  = $2;
-      $$->left  = std::unique_ptr<Expression>($1);
-      $$->right = std::unique_ptr<Expression>($3);
+      $$ = new ComparisonExpr($2, $1, $3);
     }
     | expression IS NIL
     {
-      $$        = new ConditionSqlNode;
-      $$->comp  = IS_NULL;
-      $$->left  = std::unique_ptr<Expression>($1);
-      $$->right = std::unique_ptr<Expression>(new ValueExpr(Value(AttrType::NULLS, nullptr)));
+      $$ = new ComparisonExpr(IS_NULL, $1, new ValueExpr(Value(AttrType::NULLS, nullptr)));
     }
     | expression IS NOT NIL
     {
-      $$        = new ConditionSqlNode;
-      $$->comp  = NOT_NULL;
-      $$->left  = std::unique_ptr<Expression>($1);
-      $$->right = std::unique_ptr<Expression>(new ValueExpr(Value(AttrType::NULLS, nullptr)));
+      $$ = new ComparisonExpr(NOT_NULL, $1, new ValueExpr(Value(AttrType::NULLS, nullptr)));
     }
     ;
 

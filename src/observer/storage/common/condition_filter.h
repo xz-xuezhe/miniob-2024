@@ -48,7 +48,7 @@ public:
   virtual ~DefaultConditionFilter();
 
   RC init(std::unique_ptr<Expression> left, std::unique_ptr<Expression> right, AttrType attr_type, CompOp comp_op, std::unique_ptr<RowTuple> tuple);
-  RC init(Table &table, ConditionSqlNode &condition);
+  RC init(Table &table, std::unique_ptr<Expression>);
 
   virtual bool filter(Record &rec) const;
 
@@ -65,28 +65,4 @@ private:
   AttrType                    attr_type_ = AttrType::UNDEFINED;
   CompOp                      comp_op_   = NO_OP;
   std::unique_ptr<RowTuple>   tuple_;
-};
-
-class CompositeConditionFilter : public ConditionFilter
-{
-public:
-  CompositeConditionFilter() = default;
-  virtual ~CompositeConditionFilter();
-
-  RC init(const ConditionFilter *filters[], int filter_num);
-  RC init(Table &table, ConditionSqlNode *conditions, int condition_num);
-
-  virtual bool filter(Record &rec) const;
-
-public:
-  int                    filter_num() const { return filter_num_; }
-  const ConditionFilter &filter(int index) const { return *filters_[index]; }
-
-private:
-  RC init(const ConditionFilter *filters[], int filter_num, bool own_memory);
-
-private:
-  const ConditionFilter **filters_      = nullptr;
-  int                     filter_num_   = 0;
-  bool                    memory_owner_ = false;  // filters_的内存是否由自己来控制
 };

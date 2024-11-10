@@ -279,6 +279,7 @@ class ComparisonExpr : public Expression
 {
 public:
   ComparisonExpr(CompOp comp, std::unique_ptr<Expression> left, std::unique_ptr<Expression> right);
+  ComparisonExpr(CompOp comp, Expression *left, Expression *right);
   virtual ~ComparisonExpr();
 
   ExprType type() const override { return ExprType::COMPARISON; }

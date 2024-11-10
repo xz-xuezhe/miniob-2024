@@ -110,79 +110,22 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   last_oper = &table_oper;
 
   const std::vector<Table *> &tables = select_stmt->tables();
-  std::unordered_map<std::string, Table *> table_map;
   for (Table *table : tables) {
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
-    std::unique_ptr<Expression> join_predicate;
-    if (predicate_oper && !predicate_oper->expressions().empty() &&
-        predicate_oper->expressions()[0]->type() == ExprType::CONJUNCTION) {
-      ConjunctionExpr &conjunction_expr = static_cast<ConjunctionExpr &>(*predicate_oper->expressions()[0]);
-      if (conjunction_expr.conjunction_type() == ConjunctionExpr::Type::AND) {
-        std::vector<std::unique_ptr<Expression>> &expressions =
-            static_cast<ConjunctionExpr &>(*predicate_oper->expressions()[0]).children();
-        std::vector<std::unique_ptr<Expression>> predicates;
-        for (int i = expressions.size() - 1; ~i; i--) {
-          if (expressions[i]->type() != ExprType::COMPARISON)
-            continue;
-          ComparisonExpr &expression = static_cast<ComparisonExpr &>(*expressions[i]);
-          if (expression.left()->type() != ExprType::VALUE && expression.right()->type() != ExprType::VALUE)
-            continue;
-          if ((expression.left()->type() == ExprType::VALUE && expression.right()->type() == ExprType::VALUE) ||
-              (expression.left()->type() == ExprType::FIELD &&
-                  strcmp(static_cast<FieldExpr &>(*expression.left()).table_name(), table->name()) == 0) ||
-              (expression.right()->type() == ExprType::FIELD &&
-                  strcmp(static_cast<FieldExpr &>(*expression.right()).table_name(), table->name()) == 0)) {
-            predicates.emplace_back(std::move(expressions[i]));
-            expressions.erase(expressions.begin() + i);
-          }
-        }
-        if (!predicates.empty()) {
-          reverse(predicates.begin(), predicates.end());
-          static_cast<TableGetLogicalOperator &>(*table_get_oper).set_predicates(std::move(predicates));
-        }
-        for (int i = expressions.size() - 1; ~i; i--) {
-          if (expressions[i]->type() != ExprType::COMPARISON)
-            continue;
-          ComparisonExpr &expression = static_cast<ComparisonExpr &>(*expressions[i]);
-          if (expression.comp() != CompOp::EQUAL_TO)
-            continue;
-          if (expression.left()->type() != ExprType::FIELD || expression.right()->type() != ExprType::FIELD)
-            continue;
-          FieldExpr &left  = static_cast<FieldExpr &>(*expression.left());
-          FieldExpr &right = static_cast<FieldExpr &>(*expression.right());
-          if (left.value_type() != right.value_type())
-            continue;
-          if (strcmp(left.table_name(), table->name()) == 0 && table_map.count(right.table_name())) {
-            expression.left().swap(expression.right());
-            join_predicate = std::move(expressions[i]);
-            expressions.erase(expressions.begin() + i);
-            break;
-          } else if (strcmp(right.table_name(), table->name()) == 0 && table_map.count(left.table_name())) {
-            join_predicate = std::move(expressions[i]);
-            expressions.erase(expressions.begin() + i);
-            break;
-          }
-        }
-      }
-    }
     if (table_oper == nullptr) {
       table_oper = std::move(table_get_oper);
     } else {
       JoinLogicalOperator *join_oper = new JoinLogicalOperator;
       join_oper->add_child(std::move(table_oper));
       join_oper->add_child(std::move(table_get_oper));
-      if (join_predicate)
-        join_oper->set_predicate(std::move(join_predicate));
       table_oper = unique_ptr<LogicalOperator>(join_oper);
     }
-    table_map.insert({table->name(), table});
   }
 
   if (predicate_oper) {
     if (*last_oper) {
       predicate_oper->add_child(std::move(*last_oper));
     }
-
     last_oper = &predicate_oper;
   }
 
@@ -232,94 +175,118 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
 RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
-  RC                                  rc = RC::SUCCESS;
-  std::vector<unique_ptr<Expression>> cmp_exprs;
-  const std::vector<FilterUnit *>    &filter_units = filter_stmt->filter_units();
-  for (FilterUnit *filter_unit : filter_units) {
-    unique_ptr<Expression> left(std::move(filter_unit->left()));
-    unique_ptr<Expression> right(std::move(filter_unit->right()));
-
-    if (right->value_type() == AttrType::NULLS && (filter_unit->comp() == IS_NULL || filter_unit->comp() == NOT_NULL)) {
-      // nothing to do
-    } else if (left->value_type() != right->value_type()) {
-      auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
-      auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());
-      if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {
-        ExprType left_type = left->type();
-        auto cast_expr = make_unique<CastExpr>(std::move(left), right->value_type());
-        if (left_type == ExprType::VALUE) {
-          Value left_val;
-          if (OB_FAIL(rc = cast_expr->try_get_value(left_val)))
-          {
-            LOG_WARN("failed to get value from left child", strrc(rc));
+  logical_operator = nullptr;
+  if (filter_stmt->expression() == nullptr)
+    return RC::SUCCESS;
+  function<RC(std::unique_ptr<Expression> &)> caster = [&](std::unique_ptr<Expression> &expr) -> RC {
+    switch (expr->type()) {
+      case ExprType::COMPARISON: {
+        RC                      rc        = RC::SUCCESS;
+        ComparisonExpr         *comp_expr = static_cast<ComparisonExpr *>(expr.get());
+        CompOp                  comp      = comp_expr->comp();
+        unique_ptr<Expression> &left      = comp_expr->left();
+        unique_ptr<Expression> &right     = comp_expr->right();
+        if (right->value_type() == AttrType::NULLS && (comp == IS_NULL || comp == NOT_NULL)) {
+          // nothing to do
+        } else if (left->value_type() != right->value_type()) {
+          auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
+          auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());
+          if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {
+            ExprType left_type = left->type();
+            auto     cast_expr = make_unique<CastExpr>(std::move(left), right->value_type());
+            if (left_type == ExprType::VALUE) {
+              Value left_val;
+              if (OB_FAIL(rc = cast_expr->try_get_value(left_val))) {
+                LOG_WARN("failed to get value from left child", strrc(rc));
+                return rc;
+              }
+              left = make_unique<ValueExpr>(left_val);
+            } else {
+              left = std::move(cast_expr);
+            }
+          } else if (right_to_left_cost < left_to_right_cost && right_to_left_cost != INT32_MAX) {
+            ExprType right_type = right->type();
+            auto     cast_expr  = make_unique<CastExpr>(std::move(right), left->value_type());
+            if (right_type == ExprType::VALUE) {
+              Value right_val;
+              if (OB_FAIL(rc = cast_expr->try_get_value(right_val))) {
+                LOG_WARN("failed to get value from right child", strrc(rc));
+                return rc;
+              }
+              right = make_unique<ValueExpr>(right_val);
+            } else {
+              right = std::move(cast_expr);
+            }
+          } else if (implicit_cast_cost(left->value_type(), AttrType::FLOATS) != INT32_MAX &&
+                     implicit_cast_cost(right->value_type(), AttrType::FLOATS) != INT32_MAX) {
+            {
+              ExprType left_type = left->type();
+              auto     cast_expr = make_unique<CastExpr>(std::move(left), AttrType::FLOATS);
+              if (left_type == ExprType::VALUE) {
+                Value left_val;
+                if (OB_FAIL(rc = cast_expr->try_get_value(left_val))) {
+                  LOG_WARN("failed to get value from left child", strrc(rc));
+                  return rc;
+                }
+                left = make_unique<ValueExpr>(left_val);
+              } else {
+                left = std::move(cast_expr);
+              }
+            }
+            {
+              ExprType right_type = right->type();
+              auto     cast_expr  = make_unique<CastExpr>(std::move(right), AttrType::FLOATS);
+              if (right_type == ExprType::VALUE) {
+                Value right_val;
+                if (OB_FAIL(rc = cast_expr->try_get_value(right_val))) {
+                  LOG_WARN("failed to get value from right child", strrc(rc));
+                  return rc;
+                }
+                right = make_unique<ValueExpr>(right_val);
+              } else {
+                right = std::move(cast_expr);
+              }
+            }
+          } else {
+            rc = RC::UNSUPPORTED;
+            LOG_WARN("unsupported cast from %s to %s", attr_type_to_string(left->value_type()), attr_type_to_string(right->value_type()));
             return rc;
           }
-          left = make_unique<ValueExpr>(left_val);
-        } else {
-          left = std::move(cast_expr);
         }
-      } else if (right_to_left_cost < left_to_right_cost && right_to_left_cost != INT32_MAX) {
-        ExprType right_type = right->type();
-        auto cast_expr = make_unique<CastExpr>(std::move(right), left->value_type());
-        if (right_type == ExprType::VALUE) {
-          Value right_val;
-          if (OB_FAIL(rc = cast_expr->try_get_value(right_val)))
-          {
-            LOG_WARN("failed to get value from right child", strrc(rc));
-            return rc;
-          }
-          right = make_unique<ValueExpr>(right_val);
-        } else {
-          right = std::move(cast_expr);
-        }
-      } else if (implicit_cast_cost(left->value_type(), AttrType::FLOATS) != INT32_MAX && implicit_cast_cost(right->value_type(), AttrType::FLOATS) != INT32_MAX) {
-        {
-          ExprType left_type = left->type();
-          auto cast_expr = make_unique<CastExpr>(std::move(left), AttrType::FLOATS);
-          if (left_type == ExprType::VALUE) {
-            Value left_val;
-            if (OB_FAIL(rc = cast_expr->try_get_value(left_val)))
-            {
-              LOG_WARN("failed to get value from left child", strrc(rc));
-              return rc;
-            }
-            left = make_unique<ValueExpr>(left_val);
-          } else {
-            left = std::move(cast_expr);
-          }
-        }
-        {
-          ExprType right_type = right->type();
-          auto cast_expr = make_unique<CastExpr>(std::move(right), AttrType::FLOATS);
-          if (right_type == ExprType::VALUE) {
-            Value right_val;
-            if (OB_FAIL(rc = cast_expr->try_get_value(right_val)))
-            {
-              LOG_WARN("failed to get value from right child", strrc(rc));
-              return rc;
-            }
-            right = make_unique<ValueExpr>(right_val);
-          } else {
-            right = std::move(cast_expr);
-          }
-        }
-      } else {
-        rc = RC::UNSUPPORTED;
-        LOG_WARN("unsupported cast from %s to %s", attr_type_to_string(left->value_type()), attr_type_to_string(right->value_type()));
         return rc;
+      } break;
+      case ExprType::CAST:
+      case ExprType::CONJUNCTION:
+      case ExprType::ARITHMETIC:
+      case ExprType::AGGREGATION:
+      case ExprType::FUNCTION:
+      case ExprType::NONE:
+      case ExprType::STAR:
+      case ExprType::UNBOUND_FIELD:
+      case ExprType::FIELD:
+      case ExprType::VALUE: {
+        // do nothing
+      } break;
+      default: {
+        ASSERT(false, "Unknown expression type");
       }
     }
+    return ExpressionIterator::iterate_child_expr(*expr, caster);
+  };
 
-    ComparisonExpr *cmp_expr = new ComparisonExpr(filter_unit->comp(), std::move(left), std::move(right));
-    cmp_exprs.emplace_back(cmp_expr);
+  RC rc = caster(filter_stmt->expression());
+  if (OB_FAIL(rc))
+    return rc;
+
+  unique_ptr<Expression> expr = std::move(filter_stmt->expression());
+  if (expr->type() != ExprType::CONJUNCTION) {
+    std::vector<std::unique_ptr<Expression>> list;
+    list.emplace_back(std::move(expr));
+    ConjunctionExpr *conj_expr = new ConjunctionExpr(ConjunctionExpr::Type::AND, list);
+    expr.reset(conj_expr);
   }
 
-  unique_ptr<PredicateLogicalOperator> predicate_oper;
-  if (!cmp_exprs.empty()) {
-    unique_ptr<ConjunctionExpr> conjunction_expr(new ConjunctionExpr(ConjunctionExpr::Type::AND, cmp_exprs));
-    predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(conjunction_expr)));
-  }
-
+  unique_ptr<PredicateLogicalOperator> predicate_oper(new PredicateLogicalOperator(std::move(expr)));
   logical_operator = std::move(predicate_oper);
   return rc;
 }
@@ -470,14 +437,9 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
     collector(expression);
   }
 
-  for (FilterUnit *filter_unit : select_stmt->having()->filter_units()) {
-    find_unbound_column(filter_unit->left());
-    find_unbound_column(filter_unit->right());
-  }
-
-  for (FilterUnit *filter_unit : select_stmt->having()->filter_units()) {
-    collector(filter_unit->left());
-    collector(filter_unit->right());
+  if (select_stmt->having()->expression() != nullptr) {
+    find_unbound_column(select_stmt->having()->expression());
+    collector(select_stmt->having()->expression());
   }
 
   if (group_by_expressions.empty() && aggregate_expressions.empty()) {
@@ -494,7 +456,7 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
 
   unique_ptr<LogicalOperator> group_by_oper =
       make_unique<GroupByLogicalOperator>(std::move(group_by_expressions), std::move(aggregate_expressions));
-  if (!select_stmt->having()->filter_units().empty()) {
+  if (select_stmt->having()->expression() != nullptr) {
     unique_ptr<LogicalOperator> having_oper;
     RC rc = create_plan(select_stmt->having(), having_oper);
     if (OB_FAIL(rc))

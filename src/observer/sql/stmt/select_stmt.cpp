@@ -85,25 +85,6 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     }
   }
 
-  for (unique_ptr<ConditionSqlNode> &condition : select_sql.having) {
-    vector<unique_ptr<Expression>> bound_conditions;
-    RC rc = RC::SUCCESS;
-    rc = expression_binder.bind_expression(condition->left, bound_conditions);
-    if (OB_FAIL(rc)) {
-      LOG_WARN("bind condition failed. rc=%s", strrc(rc));
-      return rc;
-    }
-    condition->left = std::move(bound_conditions[0]);
-    bound_conditions.clear();
-    rc = expression_binder.bind_expression(condition->right, bound_conditions);
-    if (OB_FAIL(rc)) {
-      LOG_WARN("bind condition failed. rc=%s", strrc(rc));
-      return rc;
-    }
-    condition->right = std::move(bound_conditions[0]);
-    bound_conditions.clear();
-  }
-
   vector<pair<unique_ptr<Expression>, bool>> order_by;
   vector<unique_ptr<Expression>> order_by_expressions;
   for (pair<unique_ptr<Expression>, bool> &item : select_sql.order_by) {
@@ -122,38 +103,14 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   }
 
   // create filter statement in `where` statement
-  vector<unique_ptr<Expression>> bound_conditions;
-  for(unique_ptr<ConditionSqlNode> &condition : select_sql.conditions) {
-    RC rc = RC::SUCCESS;
-    rc = expression_binder.bind_expression(condition->left, bound_conditions);
-    if (OB_FAIL(rc)) {
-      LOG_WARN("bind condition failed. rc=%s", strrc(rc));
-      return rc;
-    }
-    condition->left = std::move(bound_conditions[0]);
-    bound_conditions.clear();
-    rc = expression_binder.bind_expression(condition->right, bound_conditions);
-    if (OB_FAIL(rc)) {
-      LOG_WARN("bind condition failed. rc=%s", strrc(rc));
-      return rc;
-    }
-    condition->right = std::move(bound_conditions[0]);
-    bound_conditions.clear();
-  }
   FilterStmt *filter_stmt = nullptr;
-  RC          rc          = FilterStmt::create(db,
-      default_table,
-      &table_map,
-      select_sql.conditions.data(),
-      static_cast<int>(select_sql.conditions.size()),
-      filter_stmt);
+  RC          rc = FilterStmt::create(db, default_table, &table_map, std::move(select_sql.conditions), filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
   }
   FilterStmt *having = nullptr;
-  rc                 = FilterStmt::create(
-      db, default_table, &table_map, select_sql.having.data(), static_cast<int>(select_sql.having.size()), having);
+  rc                 = FilterStmt::create(db, default_table, &table_map, std::move(select_sql.having), having);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct having filter stmt");
     return rc;

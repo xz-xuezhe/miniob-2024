@@ -75,19 +75,16 @@ class FilterStmt
 {
 public:
   FilterStmt() = default;
-  virtual ~FilterStmt();
+  virtual ~FilterStmt() = default;
 
 public:
-  const std::vector<FilterUnit *> &filter_units() const { return filter_units_; }
-  std::vector<FilterUnit *> &      filter_units() { return filter_units_; }
+  const std::unique_ptr<Expression> &expression() const { return expression_; }
+  std::unique_ptr<Expression>       &expression() { return expression_; }
 
 public:
   static RC create(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-      std::unique_ptr<ConditionSqlNode> *conditions, int condition_num, FilterStmt *&stmt);
-
-  static RC create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-      std::unique_ptr<ConditionSqlNode> &condition, FilterUnit *&filter_unit);
+      std::unique_ptr<Expression> expression, FilterStmt *&stmt);
 
 private:
-  std::vector<FilterUnit *> filter_units_;  // 默认当前都是AND关系
+  std::unique_ptr<Expression> expression_;
 };
