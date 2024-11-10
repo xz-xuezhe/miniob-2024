@@ -97,6 +97,14 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     order_by_expressions.clear();
   }
 
+  {
+    vector<unique_ptr<Expression>> having_expressions;
+    RC rc = expression_binder.bind_expression(select_sql.having, having_expressions);
+    if (OB_FAIL(rc))
+      return rc;
+    select_sql.having = std::move(having_expressions[0]);
+  }
+
   Table *default_table = nullptr;
   if (tables.size() == 1) {
     default_table = tables[0];
