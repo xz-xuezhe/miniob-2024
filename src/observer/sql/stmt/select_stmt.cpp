@@ -97,7 +97,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     order_by_expressions.clear();
   }
 
-  {
+  if (select_sql.having) {
     vector<unique_ptr<Expression>> having_expressions;
     RC rc = expression_binder.bind_expression(select_sql.having, having_expressions);
     if (OB_FAIL(rc))
