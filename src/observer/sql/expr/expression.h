@@ -48,6 +48,8 @@ enum class ExprType
   ARITHMETIC,       ///< 算术运算
   AGGREGATION,      ///< 聚合运算
   FUNCTION,         ///< 向量函数
+  VALUE_LIST,       ///< 值列表
+  SUBQUERY,         ///< 子查询
 };
 
 /**
@@ -507,4 +509,76 @@ private:
   Type                        function_type_;
   std::unique_ptr<Expression> left_;
   std::unique_ptr<Expression> right_;
+};
+
+class MultiRowExpr : public Expression
+{
+public:
+  virtual RC open() = 0;
+  virtual RC next() = 0;
+  virtual Value *current_value() = 0;
+  virtual RC close() = 0;
+};
+
+class ValueListExpr : public MultiRowExpr
+{
+public:
+  ValueListExpr(const std::vector<Value> &value_list) : value_list_(value_list) { value_it_ = value_list_.end(); }
+  virtual ~ValueListExpr() = default;
+  ExprType type() const override { return ExprType::VALUE_LIST; }
+  AttrType value_type() const override { return AttrType::UNDEFINED; }
+  RC       get_value(const Tuple &tuple, Value &value) const override
+  {
+    if (value_list_.size() == 1) {
+      value = value_list_[0];
+      return RC::SUCCESS;
+    }
+    return RC::INTERNAL;
+  }
+  std::vector<Value> &value_list() { return value_list_; }
+
+public:
+  RC     open() override;
+  RC     next() override;
+  Value *current_value() override { return current_value_; }
+  RC     close() override;
+
+private:
+  std::vector<Value>           value_list_;
+  std::vector<Value>::iterator value_it_;
+  Value                       *current_value_;
+};
+
+class Stmt;
+class LogicalOperator;
+class PhysicalOperator;
+
+class SubqueryExpr : public MultiRowExpr
+{
+public:
+  SubqueryExpr(ParsedSqlNode *sql_node);
+  virtual ~SubqueryExpr();
+  ExprType                           type() const override { return ExprType::SUBQUERY; }
+  AttrType                           value_type() const override;
+  RC                                 get_value(const Tuple &tuple, Value &value) const override;
+  Trx                               *trx() { return trx_; }
+  std::unique_ptr<ParsedSqlNode>    &sql_node() { return sql_node_; }
+  std::unique_ptr<Stmt>             &stmt() { return stmt_; }
+  std::unique_ptr<LogicalOperator>  &logical_operator() { return logical_operator_; }
+  std::unique_ptr<PhysicalOperator> &physical_operator() { return physical_operator_; }
+  void                               set_trx(Trx *trx) { trx_ = trx; }
+
+public:
+  RC     open() override;
+  RC     next() override;
+  Value *current_value() override { return &value_; }
+  RC     close() override;
+
+private:
+  Trx                              *trx_;
+  Value                             value_;
+  std::unique_ptr<ParsedSqlNode>    sql_node_;
+  std::unique_ptr<Stmt>             stmt_;
+  std::unique_ptr<LogicalOperator>  logical_operator_;
+  std::unique_ptr<PhysicalOperator> physical_operator_;
 };

@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/filter_stmt.h"
 #include "storage/field/field.h"
 #include "storage/record/record.h"
+#include "sql/expr/expression_iterator.h"
 
 PredicatePhysicalOperator::PredicatePhysicalOperator(std::unique_ptr<Expression> expr) : expression_(std::move(expr))
 {
@@ -29,6 +30,18 @@ RC PredicatePhysicalOperator::open(Trx *trx)
     LOG_WARN("predicate operator must has one child");
     return RC::INTERNAL;
   }
+
+  function<RC(std::unique_ptr<Expression> &)> set_trx = [&](std::unique_ptr<Expression> &expr) -> RC {
+    if (expr->type() == ExprType::SUBQUERY) {
+      SubqueryExpr *subquery_expr = static_cast<SubqueryExpr *>(expr.get());
+      subquery_expr->set_trx(trx);
+    }
+    return ExpressionIterator::iterate_child_expr(*expr, set_trx);
+  };
+
+  RC rc = set_trx(expression_);
+  if (OB_FAIL(rc))
+    return rc;
 
   return children_[0]->open(trx);
 }

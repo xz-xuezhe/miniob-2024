@@ -52,7 +52,7 @@ RC ProjectPhysicalOperator::next()
 RC ProjectPhysicalOperator::close()
 {
   if (!children_.empty()) {
-    children_[0]->close();
+    return children_[0]->close();
   }
   return RC::SUCCESS;
 }

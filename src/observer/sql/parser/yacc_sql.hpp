@@ -118,15 +118,17 @@ extern int yydebug;
     NE = 319,                      /* NE  */
     IS = 320,                      /* IS  */
     LK = 321,                      /* LK  */
-    L2_DISTANCE = 322,             /* L2_DISTANCE  */
-    COSINE_DISTANCE = 323,         /* COSINE_DISTANCE  */
-    INNER_PRODUCT = 324,           /* INNER_PRODUCT  */
-    NUMBER = 325,                  /* NUMBER  */
-    FLOAT = 326,                   /* FLOAT  */
-    ID = 327,                      /* ID  */
-    AGGREGATE = 328,               /* AGGREGATE  */
-    SSS = 329,                     /* SSS  */
-    UMINUS = 330                   /* UMINUS  */
+    IN = 322,                      /* IN  */
+    EXISTS = 323,                  /* EXISTS  */
+    L2_DISTANCE = 324,             /* L2_DISTANCE  */
+    COSINE_DISTANCE = 325,         /* COSINE_DISTANCE  */
+    INNER_PRODUCT = 326,           /* INNER_PRODUCT  */
+    NUMBER = 327,                  /* NUMBER  */
+    FLOAT = 328,                   /* FLOAT  */
+    ID = 329,                      /* ID  */
+    AGGREGATE = 330,               /* AGGREGATE  */
+    SSS = 331,                     /* SSS  */
+    UMINUS = 332                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -135,7 +137,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 136 "yacc_sql.y"
+#line 138 "yacc_sql.y"
 
   ParsedSqlNode *                                            sql_node;
   Expression *                                               condition;
@@ -161,7 +163,7 @@ union YYSTYPE
   float                                                      floats;
   bool                                                       booleans;
 
-#line 165 "yacc_sql.hpp"
+#line 167 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

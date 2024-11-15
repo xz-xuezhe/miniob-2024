@@ -128,6 +128,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NE
         IS
         LK
+        IN
+        EXISTS
         L2_DISTANCE
         COSINE_DISTANCE
         INNER_PRODUCT
@@ -748,6 +750,9 @@ expression:
       $$ = new StarExpr();
       $$->set_name("*");
     }
+    | LBRACE select_stmt RBRACE {
+      $$ = new SubqueryExpr($2);
+    }
     ;
 
 rel_attr:
@@ -913,6 +918,42 @@ condition:
     | expression IS NOT NIL
     {
       $$ = new ComparisonExpr(NOT_NULL, $1, new ValueExpr(Value(AttrType::NULLS, nullptr)));
+    }
+    | expression IN LBRACE value value_list RBRACE
+    {
+      vector<Value> vl;
+      if ($5 != nullptr) {
+        vl.swap(*$5);
+        delete $5;
+      }
+      vl.emplace(vl.begin(), $4);
+      $$ = new ComparisonExpr(SUB_IN, $1, new ValueListExpr(vl));
+    }
+    | expression NOT IN LBRACE value value_list RBRACE
+    {
+      vector<Value> vl;
+      if ($6 != nullptr) {
+        vl.swap(*$6);
+        delete $6;
+      }
+      vl.emplace(vl.begin(), $5);
+      $$ = new ComparisonExpr(SUB_NOT_IN, $1, new ValueListExpr(vl));
+    }
+    | expression IN LBRACE select_stmt RBRACE
+    {
+      $$ = new ComparisonExpr(SUB_IN, $1, new SubqueryExpr($4));
+    }
+    | expression NOT IN LBRACE select_stmt RBRACE
+    {
+      $$ = new ComparisonExpr(SUB_NOT_IN, $1, new SubqueryExpr($5));
+    }
+    | EXISTS LBRACE select_stmt RBRACE
+    {
+      $$ = new ComparisonExpr(SUB_EXISTS, new SubqueryExpr($3), new ValueExpr(Value(AttrType::NULLS, nullptr)));
+    }
+    | NOT EXISTS LBRACE select_stmt RBRACE
+    {
+      $$ = new ComparisonExpr(SUB_NOT_EXISTS, new SubqueryExpr($4), new ValueExpr(Value(AttrType::NULLS, nullptr)));
     }
     ;
 

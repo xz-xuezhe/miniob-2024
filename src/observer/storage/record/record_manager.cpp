@@ -79,6 +79,13 @@ void RecordPageIterator::init(RecordPageHandler *record_page_handler, SlotNum st
   next_slot_num_ = bitmap_.next_setted_bit(start_slot_num);
 }
 
+void RecordPageIterator::reset()
+{
+  record_page_handler_ = nullptr;
+  page_num_            = BP_INVALID_PAGE_NUM;
+  next_slot_num_       = 0;
+}
+
 bool RecordPageIterator::has_next() { return -1 != next_slot_num_; }
 
 RC RecordPageIterator::next(Record &record)
@@ -844,6 +851,7 @@ RC RecordFileScanner::close_scan()
     record_page_handler_->cleanup();
     delete record_page_handler_;
     record_page_handler_ = nullptr;
+    record_page_iterator_.reset();
   }
 
   return RC::SUCCESS;

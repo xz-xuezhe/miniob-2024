@@ -61,69 +61,39 @@ RC FilterStmt::create(Db *db, Table *default_table, std::unordered_map<std::stri
   }
 
   function<RC(std::unique_ptr<Expression> &)> checker = [&](unique_ptr<Expression> &expr) -> RC {
-    switch (expr->type()) {
-      case ExprType::STAR: {
+    if (expr->type() == ExprType::STAR)
+      return RC::INVALID_ARGUMENT;
+    if (expr->type() == ExprType::COMPARISON) {
+      RC rc = RC::SUCCESS;
+      ComparisonExpr *comp_expr = static_cast<ComparisonExpr *>(expr.get());
+      CompOp          comp      = comp_expr->comp();
+      if (comp < EQUAL_TO || comp > NO_OP)
         return RC::INVALID_ARGUMENT;
-      } break;
-      case ExprType::COMPARISON: {
-        RC rc = RC::SUCCESS;
-        ComparisonExpr *comp_expr = static_cast<ComparisonExpr *>(expr.get());
-        CompOp          comp      = comp_expr->comp();
-        if (comp < EQUAL_TO || comp > NO_OP)
-          return RC::INVALID_ARGUMENT;
-        return rc;
-      } break;
-      case ExprType::VALUE:
-      case ExprType::FIELD:
-      case ExprType::UNBOUND_FIELD:
-      case ExprType::NONE:
-      case ExprType::CAST:
-      case ExprType::CONJUNCTION:
-      case ExprType::ARITHMETIC:
-      case ExprType::AGGREGATION:
-      case ExprType::FUNCTION: {
-        // Do nothing
-      } break;
-      default: {
-        ASSERT(false, "Unknown expression type");
-      }
+      return rc;
     }
     return ExpressionIterator::iterate_child_expr(*expr, checker);
   };
 
   function<RC(std::unique_ptr<Expression> &)> binder = [&](unique_ptr<Expression> &expr) -> RC {
     RC rc = RC::SUCCESS;
-    switch (expr->type()) {
-      case ExprType::STAR: {
-        return RC::INVALID_ARGUMENT;
-      } break;
-      case ExprType::VALUE:
-      case ExprType::FIELD: {
-        return RC::SUCCESS;
-      } break;
-      case ExprType::UNBOUND_FIELD: {
-        Table           *table      = nullptr;
-        const FieldMeta *field_meta = nullptr;
-        rc                          = get_table_and_field(
-            db, default_table, tables, static_cast<const UnboundFieldExpr &>(*expr), table, field_meta);
-        if (OB_FAIL(rc))
-          return rc;
-        Field field(table, field_meta);
-        expr.reset(new FieldExpr(field));
+    if (expr->type() == ExprType::UNBOUND_FIELD) {
+      Table           *table      = nullptr;
+      const FieldMeta *field_meta = nullptr;
+      rc                          = get_table_and_field(
+          db, default_table, tables, static_cast<const UnboundFieldExpr &>(*expr), table, field_meta);
+      if (OB_FAIL(rc))
         return rc;
-      } break;
-      case ExprType::NONE:
-      case ExprType::CAST:
-      case ExprType::COMPARISON:
-      case ExprType::CONJUNCTION:
-      case ExprType::ARITHMETIC:
-      case ExprType::AGGREGATION:
-      case ExprType::FUNCTION: {
-        // Do nothing
-      } break;
-      default: {
-        ASSERT(false, "Unknown expression type");
-      }
+      Field field(table, field_meta);
+      expr.reset(new FieldExpr(field));
+      return rc;
+    }
+    if (expr->type() == ExprType::SUBQUERY) {
+      SubqueryExpr *subquery_expr = static_cast<SubqueryExpr *>(expr.get());
+      Stmt *stmt = nullptr;
+      RC rc = Stmt::create_stmt(db, *subquery_expr->sql_node(), stmt);
+      if (OB_FAIL(rc))
+        return rc;
+      subquery_expr->stmt().reset(stmt);
     }
     return ExpressionIterator::iterate_child_expr(*expr, binder);
   };

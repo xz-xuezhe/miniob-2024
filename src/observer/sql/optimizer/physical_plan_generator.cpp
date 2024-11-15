@@ -47,6 +47,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/scalar_group_by_physical_operator.h"
 #include "sql/operator/table_scan_vec_physical_operator.h"
 #include "sql/optimizer/physical_plan_generator.h"
+#include "sql/expr/expression_iterator.h"
 
 using namespace std;
 
@@ -139,9 +140,26 @@ RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, u
   // 看看是否有可以用于索引查找的表达式
   Table *table = table_get_oper.table();
 
-  Index     *index      = nullptr;
-  ValueExpr *value_expr = nullptr;
+  Index                                      *index      = nullptr;
+  ValueExpr                                  *value_expr = nullptr;
+  function<RC(std::unique_ptr<Expression> &)> binder     = [&](unique_ptr<Expression> &expr) -> RC {
+    if (expr->type() == ExprType::SUBQUERY) {
+      SubqueryExpr *subquery_expr = static_cast<SubqueryExpr *>(expr.get());
+      RC rc = create(*subquery_expr->logical_operator(), subquery_expr->physical_operator());
+      if (OB_FAIL(rc))
+        return rc;
+      ASSERT(subquery_expr->physical_operator()->type() == PhysicalOperatorType::PROJECT, "should be project");
+      ProjectPhysicalOperator *project = static_cast<ProjectPhysicalOperator *>(subquery_expr->physical_operator().get());
+      if (project->cell_num() != 1)
+        return RC::INTERNAL;
+    }
+    return ExpressionIterator::iterate_child_expr(*expr, binder);
+  };
   for (auto &expr : predicates) {
+    RC rc = binder(expr);
+    if (OB_FAIL(rc))
+      return rc;
+
     if (expr->type() == ExprType::COMPARISON) {
       auto comparison_expr = static_cast<ComparisonExpr *>(expr.get());
       // 简单处理，就找等值查询
@@ -222,6 +240,25 @@ RC PhysicalPlanGenerator::create_plan(PredicateLogicalOperator &pred_oper, uniqu
   ASSERT(expressions.size() == 1, "predicate logical operator's children should be 1");
 
   unique_ptr<Expression> expression = std::move(expressions.front());
+
+  function<RC(std::unique_ptr<Expression> &)> binder = [&](unique_ptr<Expression> &expr) -> RC {
+    if (expr->type() == ExprType::SUBQUERY) {
+      SubqueryExpr *subquery_expr = static_cast<SubqueryExpr *>(expr.get());
+      RC rc = create(*subquery_expr->logical_operator(), subquery_expr->physical_operator());
+      if (OB_FAIL(rc))
+        return rc;
+      ASSERT(subquery_expr->physical_operator()->type() == PhysicalOperatorType::PROJECT, "should be project");
+      ProjectPhysicalOperator *project = static_cast<ProjectPhysicalOperator *>(subquery_expr->physical_operator().get());
+      if (project->cell_num() != 1)
+        return RC::INTERNAL;
+    }
+    return ExpressionIterator::iterate_child_expr(*expr, binder);
+  };
+
+  rc = binder(expression);
+  if (OB_FAIL(rc))
+    return rc;
+
   oper = unique_ptr<PhysicalOperator>(new PredicatePhysicalOperator(std::move(expression)));
   oper->add_child(std::move(child_phy_oper));
   return rc;

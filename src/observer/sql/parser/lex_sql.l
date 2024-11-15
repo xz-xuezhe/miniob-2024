@@ -133,6 +133,8 @@ WITH                                    RETURN_TOKEN(WITH);
 AS                                      RETURN_TOKEN(AS);
 IS                                      RETURN_TOKEN(IS);
 LIKE                                    RETURN_TOKEN(LK);
+IN                                      RETURN_TOKEN(IN);
+EXISTS                                  RETURN_TOKEN(EXISTS);
 COUNT                                   yylval->string=strdup(yytext); RETURN_TOKEN(AGGREGATE);
 SUM                                     yylval->string=strdup(yytext); RETURN_TOKEN(AGGREGATE);
 AVG                                     yylval->string=strdup(yytext); RETURN_TOKEN(AGGREGATE);

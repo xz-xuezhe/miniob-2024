@@ -16,6 +16,11 @@ See the Mulan PSL v2 for more details. */
 #include "common/type/attr_type.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
+#include "sql/stmt/stmt.h"
+#include "sql/operator/logical_operator.h"
+#include "sql/operator/physical_operator.h"
+#include "sql/operator/project_logical_operator.h"
+#include "sql/operator/project_physical_operator.h"
 
 using namespace std;
 
@@ -224,6 +229,101 @@ RC ComparisonExpr::try_get_value(Value &cell) const
 
 RC ComparisonExpr::get_value(const Tuple &tuple, Value &value) const
 {
+  if (comp_ == SUB_IN || comp_ == SUB_NOT_IN) {
+    Value left_value;
+    RC rc = left_->get_value(tuple, left_value);
+    if (OB_FAIL(rc))
+      return rc;
+    if (right_->type() != ExprType::VALUE_LIST && right_->type() != ExprType::SUBQUERY)
+      return RC::INTERNAL;
+    MultiRowExpr *multi_row_expr = static_cast<MultiRowExpr *>(right_.get());
+    rc = multi_row_expr->open();
+    if (OB_FAIL(rc))
+      return rc;
+    bool found = false;
+    while ((rc = multi_row_expr->next()) != RC::RECORD_EOF) {
+      if (OB_FAIL(rc))
+        return rc;
+      Value right_value = *multi_row_expr->current_value();
+      if (left_value.is_null() || right_value.is_null()) {
+        if (comp_ == SUB_IN) {
+          continue;
+        } else {
+          found = true;
+          break;
+        }
+      }
+      AttrType type = AttrType::UNDEFINED;
+      if (left_value.attr_type() != right_value.attr_type()) {
+        auto implicit_cast_cost = [](AttrType from, AttrType to) {
+          if (from == to)
+            return 0;
+          return DataType::type_instance(from)->cast_cost(to);
+        };
+        auto left_to_right_cost = implicit_cast_cost(left_value.attr_type(), right_value.attr_type());
+        auto right_to_left_cost = implicit_cast_cost(right_value.attr_type(), left_value.attr_type());
+        if (left_to_right_cost <= right_to_left_cost && left_to_right_cost != INT32_MAX) {
+          type = right_value.attr_type();
+        } else if (right_to_left_cost < left_to_right_cost && right_to_left_cost != INT32_MAX) {
+          type = left_value.attr_type();
+        } else if (implicit_cast_cost(left_value.attr_type(), AttrType::FLOATS) != INT32_MAX &&
+                   implicit_cast_cost(right_value.attr_type(), AttrType::FLOATS) != INT32_MAX) {
+          type = AttrType::FLOATS;
+        } else {
+          rc = RC::UNSUPPORTED;
+          LOG_WARN("unsupported cast from %s to %s", attr_type_to_string(left_value.attr_type()), attr_type_to_string(right_value.attr_type()));
+          return rc;
+        }
+      } else {
+        type = left_value.attr_type();
+      }
+      if (left_value.attr_type() != type) {
+        Value temp;
+        rc = DataType::type_instance(left_value.attr_type())->cast_to(left_value, type, temp);
+        if (OB_FAIL(rc))
+          return rc;
+        left_value = temp;
+      }
+      if (right_value.attr_type() != type) {
+        Value temp;
+        rc = DataType::type_instance(right_value.attr_type())->cast_to(right_value, type, temp);
+        if (OB_FAIL(rc))
+          return rc;
+        right_value = temp;
+      }
+      if (left_value.compare(right_value) == 0) {
+        found = true;
+        break;
+      }
+    }
+    rc = multi_row_expr->close();
+    if (OB_FAIL(rc))
+      return rc;
+    value.set_boolean(found == (comp_ == SUB_IN));
+    return rc;
+  }
+
+  if (comp_ == SUB_EXISTS || comp_ == SUB_NOT_EXISTS) {
+    if (left_->type() != ExprType::VALUE_LIST && left_->type() != ExprType::SUBQUERY)
+      return RC::INTERNAL;
+    MultiRowExpr *multi_row_expr = static_cast<MultiRowExpr *>(left_.get());
+    RC rc = multi_row_expr->open();
+    if (OB_FAIL(rc))
+      return rc;
+    rc = multi_row_expr->next();
+    bool exists = true;
+    if (OB_FAIL(rc)) {
+      if (rc != RC::RECORD_EOF)
+        return rc;
+      exists = false;
+    }
+    rc = multi_row_expr->close();
+    if (OB_FAIL(rc))
+      return rc;
+    value.set_boolean(exists == (comp_ == SUB_EXISTS));
+    return rc;
+  }
+
   Value left_value;
   Value right_value;
 
@@ -759,4 +859,114 @@ RC FunctionExpr::try_get_value(Value &value) const
   }
 
   return calc_value(left_value, right_value, value);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+RC ValueListExpr::open()
+{
+  value_it_      = value_list_.begin();
+  current_value_ = nullptr;
+  return RC::SUCCESS;
+}
+
+RC ValueListExpr::next()
+{
+  if (value_it_ == value_list_.end())
+    return RC::RECORD_EOF;
+  current_value_ = &*value_it_++;
+  return RC::SUCCESS;
+}
+
+RC ValueListExpr::close()
+{
+  value_it_      = value_list_.end();
+  current_value_ = nullptr;
+  return RC::SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+SubqueryExpr::SubqueryExpr(ParsedSqlNode *sql_node) : sql_node_(sql_node) {}
+
+SubqueryExpr::~SubqueryExpr() = default;
+
+AttrType SubqueryExpr::value_type() const
+{
+  if (physical_operator_ != nullptr &&
+      static_cast<ProjectPhysicalOperator *>(physical_operator_.get())->expressions().size() == 1)
+    return static_cast<ProjectPhysicalOperator *>(physical_operator_.get())->expressions().front()->value_type();
+  if (logical_operator_ != nullptr && logical_operator_->expressions().size() == 1)
+    return logical_operator_->expressions().front()->value_type();
+  return AttrType::UNDEFINED;
+}
+
+RC SubqueryExpr::get_value(const Tuple &tuple, Value &value) const
+{
+  RC rc = RC::SUCCESS;
+  if (trx_ == nullptr || physical_operator_ == nullptr)
+    return RC::INTERNAL;
+  rc = physical_operator_->open(trx_);
+  if (OB_FAIL(rc))
+    return rc;
+  rc = physical_operator_->next();
+  if (OB_FAIL(rc)) {
+    if (rc == RC::RECORD_EOF) {
+      rc = physical_operator_->close();
+      if (OB_FAIL(rc))
+        return rc;
+      value.set_null();
+      return RC::SUCCESS;
+    }
+    return rc;
+  }
+  const Tuple *current_tuple = physical_operator_->current_tuple();
+  if (current_tuple->cell_num() != 1) {
+    physical_operator_->close();
+    return RC::INTERNAL;
+  }
+  Value temp;
+  rc = current_tuple->cell_at(0, temp);
+  if (OB_FAIL(rc))
+    return rc;
+  rc = physical_operator_->next();
+  if (rc != RC::RECORD_EOF) {
+    if (OB_SUCC(rc))
+      physical_operator_->close();
+    return RC::INTERNAL;
+  }
+  rc = physical_operator_->close();
+  if (OB_FAIL(rc))
+    return rc;
+  value = std::move(temp);
+  return RC::SUCCESS;
+}
+
+RC SubqueryExpr::open()
+{
+  if (trx_ == nullptr || physical_operator_ == nullptr)
+    return RC::INTERNAL;
+  return physical_operator_->open(trx_);
+}
+
+RC SubqueryExpr::next()
+{
+  if (physical_operator_ == nullptr)
+    return RC::INTERNAL;
+  RC rc = physical_operator_->next();
+  if (OB_FAIL(rc))
+    return rc;
+  const Tuple *current_tuple = physical_operator_->current_tuple();
+  if (current_tuple->cell_num() != 1) {
+    physical_operator_->close();
+    return RC::INTERNAL;
+  }
+  return current_tuple->cell_at(0, value_);
+}
+
+RC SubqueryExpr::close()
+{
+  if (physical_operator_ == nullptr)
+    return RC::INTERNAL;
+  return physical_operator_->close();
 }

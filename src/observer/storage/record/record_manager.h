@@ -95,6 +95,11 @@ public:
   void init(RecordPageHandler *record_page_handler, SlotNum start_slot_num = 0);
 
   /**
+   * @brief 重置一个迭代器
+   */
+  void reset();
+
+  /**
    * @brief 判断是否有下一个记录
    */
   bool has_next();

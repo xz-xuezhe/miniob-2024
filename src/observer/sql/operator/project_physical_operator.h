@@ -39,6 +39,7 @@ public:
   Tuple *current_tuple() override;
 
   RC tuple_schema(TupleSchema &schema) const override;
+  const std::vector<std::unique_ptr<Expression>> &expressions() const { return expressions_; }
 
 private:
   std::vector<std::unique_ptr<Expression>>     expressions_;

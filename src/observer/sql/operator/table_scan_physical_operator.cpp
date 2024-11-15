@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/table_scan_physical_operator.h"
 #include "event/sql_debug.h"
 #include "storage/table/table.h"
+#include "sql/expr/expression_iterator.h"
 
 using namespace std;
 
@@ -25,6 +26,21 @@ RC TableScanPhysicalOperator::open(Trx *trx)
     tuple_.set_schema(table_, table_->table_meta().field_metas());
   }
   trx_ = trx;
+
+  function<RC(std::unique_ptr<Expression> &)> set_trx = [&](std::unique_ptr<Expression> &expr) -> RC {
+    if (expr->type() == ExprType::SUBQUERY) {
+      SubqueryExpr *subquery_expr = static_cast<SubqueryExpr *>(expr.get());
+      subquery_expr->set_trx(trx);
+    }
+    return ExpressionIterator::iterate_child_expr(*expr, set_trx);
+  };
+
+  for (auto &predicate : predicates_) {
+    rc = set_trx(predicate);
+    if (OB_FAIL(rc))
+      return rc;
+  }
+
   return rc;
 }
 
@@ -75,6 +91,7 @@ RC TableScanPhysicalOperator::filter(RowTuple &tuple, bool &result)
   for (unique_ptr<Expression> &expr : predicates_) {
     rc = expr->get_value(tuple, value);
     if (rc != RC::SUCCESS) {
+      close();
       return rc;
     }
 
